@@ -17,14 +17,35 @@ const funnel = [{ label: "Failed", value: "2,847", width: "100%" }, { label: "Di
 function Principle() { return <div className="flex items-center gap-3 rounded-lg border border-ai/20 bg-ai-soft px-4 py-3"><BrainCircuit className="size-4 shrink-0 text-ai"/><p className="text-xs text-muted-foreground"><strong className="text-foreground">The AI proposes.</strong> The Policy Engine decides.</p></div>; }
 function SectionTitle({ title, sub, action }: { title: string; sub: string; action?: React.ReactNode }) { return <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4"><div className="min-w-0"><h2 className="text-base font-semibold text-foreground">{title}</h2><p className="mt-1 text-xs text-muted-foreground">{sub}</p></div>{action}</div>; }
 function CasesTable({ rows = cases }: { rows?: RecoveryCase[] }) { return <div className="mt-5 overflow-x-auto"><table className="w-full min-w-[880px] text-left"><thead><tr className="border-b border-border text-[10px] uppercase tracking-[0.1em] text-muted-foreground"><th className="pb-3 font-medium">Payment</th><th className="pb-3 font-medium">Amount</th><th className="pb-3 font-medium">Failure</th><th className="pb-3 font-medium">Diagnosis</th><th className="pb-3 font-medium">Action</th><th className="pb-3 font-medium">Status</th><th/></tr></thead><tbody>{rows.map((c) => <tr key={c.id} className="group border-b border-border/60 text-sm last:border-0 hover:bg-accent/30"><td className="py-4"><p className="font-mono text-xs text-foreground">{c.payment}</p><p className="mt-1 text-[11px] text-muted-foreground">{c.customer}</p></td><td className="py-4 font-medium text-foreground">{c.amount}</td><td className="py-4 text-muted-foreground">{c.failure}</td><td className="max-w-52 py-4 text-muted-foreground">{c.diagnosis}</td><td className="max-w-52 py-4 text-muted-foreground">{c.action}</td><td className="py-4"><Badge status={c.status}/></td><td className="py-4"><Link to="/recovery-cases/$caseId" params={{ caseId: c.id }} aria-label={`View ${c.id}`} className="grid size-8 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"><ChevronRight className="size-4"/></Link></td></tr>)}</tbody></table></div>; }
+function formatRecoveryCase(c: any): RecoveryCase {
+  return {
+    id: c.payment_id,
+    payment: c.payment_id,
+    customer: "Customer",
+    amount: `₹${Number(c.amount_inr).toLocaleString("en-IN")}`,
+    failure: c.diagnosis.root_cause.replaceAll("_", " "),
+    diagnosis: c.diagnosis.diagnosis,
+    action: c.ai_proposal.proposal,
+    status: c.final_decision === "APPROVE" ? "Recovered" : "Blocked",
+    history: `${c.previous_successes} previous successes · ${c.previous_failures} previous failures`,
+    probability: Math.round(c.recovery_value.recovery_probability * 100),
+  };
+}
 
 export function OverviewPage() {
   const [metrics, setMetrics] = useState<any>(null);
+  const [recentCases, setRecentCases] = useState<RecoveryCase[]>([]);
 
   useEffect(() => {
     getOverviewMetrics()
       .then(setMetrics)
       .catch((error) => console.error("Metrics error:", error));
+
+    getRecoveryCases()
+      .then((data) =>
+        setRecentCases((data.cases || []).slice(0, 5).map(formatRecoveryCase))
+      )
+      .catch((error) => console.error("Cases error:", error));
   }, []);
 
   const formatINR = (value: number) => {
@@ -263,7 +284,7 @@ export function OverviewPage() {
           }
         />
 
-        <CasesTable rows={cases.slice(0, 5)} />
+        <CasesTable rows={recentCases} />
       </Panel>
     </div>
   );
@@ -280,29 +301,13 @@ export function RecoveryCasesPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const rows = casesData.filter((c) =>
-    `${c.payment_id} ${c.failure_code} ${c.diagnosis.root_cause}`
-      .toLowerCase()
-      .includes(query.toLowerCase())
-  );
-
-  const formattedRows: RecoveryCase[] = rows.map((c) => ({
-    id: c.payment_id,
-    payment: c.payment_id,
-    customer: "Customer",
-    amount: `₹${Number(c.amount_inr).toLocaleString("en-IN")}`,
-    failure: c.diagnosis.root_cause.replaceAll("_", " "),
-    diagnosis: c.diagnosis.diagnosis,
-    action: c.ai_proposal.proposal,
-    status:
-      c.final_decision === "APPROVE"
-        ? "Recovered"
-        : "Blocked",
-    history: `${c.previous_successes} previous successes · ${c.previous_failures} previous failures`,
-    probability: Math.round(
-      c.recovery_value.recovery_probability * 100
-    ),
-  }));
+  const rows: RecoveryCase[] = casesData
+    .filter((c) =>
+      `${c.payment_id} ${c.failure_code} ${c.diagnosis.root_cause}`
+        .toLowerCase()
+        .includes(query.toLowerCase())
+    )
+    .map(formatRecoveryCase);
 
   return (
     <div className="space-y-6">
@@ -343,7 +348,7 @@ export function RecoveryCasesPage() {
             Loading recovery cases...
           </div>
         ) : (
-          <CasesTable rows={formattedRows} />
+          <CasesTable rows={rows} />
         )}
       </Panel>
     </div>

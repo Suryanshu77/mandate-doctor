@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from app.api.diagnosis import router as diagnosis_router
 from app.api.cases import router as cases_router
 from app.api.audit import router as audit_router
+from app.services.recovery_pipeline import get_overview
 
 
 app = FastAPI(
@@ -32,30 +33,7 @@ def health_check():
 
 @app.get("/api/overview")
 def overview():
-    return {
-        "revenue_at_risk": 692500.00,
-        "expected_recovery": 289818.30,
-        "expected_recovery_rate": 41.85,
-        "expected_unrecovered": 402681.70,
-        "approved_recoveries": 226,
-        "total_records": 300,
-        "diagnosis_accuracy": 100.0,
-        "diagnosis_counts": {
-            "BANK_TIMEOUT": 98,
-            "LIMIT_EXCEEDED": 48,
-            "REVOKED": 30,
-            "BALANCE": 80,
-            "EXPIRED_MANDATE": 44,
-        },
-        "ai_proposals": {
-            "RETRY_LATER": 226,
-            "REQUEST_FRESH_MANDATE": 74,
-        },
-        "policy_decisions": {
-            "APPROVE": 226,
-            "BLOCK": 74,
-        },
-    }
+    return get_overview()
 
 
 app.include_router(diagnosis_router)
