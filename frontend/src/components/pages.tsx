@@ -361,13 +361,149 @@ const steps = [
   ["Action Executed","Pending","Queued until approval is recorded","action"], ["Recovery Result","Pending","Awaiting permitted execution","pending"],
 ];
 export function CaseReplayPage() { return <div className="space-y-6"><div className="flex items-center gap-2 text-xs text-muted-foreground"><Link to="/recovery-cases" className="hover:text-foreground">Recovery Cases</Link><ChevronRight className="size-3"/><span className="text-foreground">RC-2048</span></div><PageHeader eyebrow="Decision replay · RC-2048" title="₹84,000 · Aarav Mehta" description="A complete, deterministic replay of how this failed payment was diagnosed and governed." action={<Badge status="Pending"/>}/><div className="grid gap-6 xl:grid-cols-[1fr_320px]"><Panel className="p-6"><SectionTitle title="Recovery decision trace" sub="Every step is timestamped and reproducible" action={<Button variant="secondary"><Play className="size-4"/>Replay</Button>}/><div className="mt-7">{steps.map((s,i)=><div key={s[0]} className="grid grid-cols-[32px_minmax(0,1fr)] gap-4"><div className="flex flex-col items-center"><div className={`grid size-8 place-items-center rounded-full border ${s[3]==="policy"?"border-primary/40 bg-primary-soft text-primary":s[3]==="failure"?"border-danger/40 bg-danger-soft text-danger":s[3]==="pending"?"border-warning/40 bg-warning-soft text-warning":"border-ai/30 bg-ai-soft text-ai"}`}>{s[3]==="failure"?<X className="size-3.5"/>:s[3]==="policy"?<ShieldCheck className="size-3.5"/>:s[3]==="action"?<Zap className="size-3.5"/>:s[3]==="pending"?<Clock3 className="size-3.5"/>:<Check className="size-3.5"/>}</div>{i<steps.length-1&&<div className="my-1 min-h-10 w-px flex-1 bg-border"/>}</div><div className="pb-7"><div className="flex items-center justify-between gap-4"><p className="text-sm font-semibold text-foreground">{s[0]}</p><span className="font-mono text-[10px] text-muted-foreground">{s[1]}</span></div><p className="mt-1.5 text-xs leading-5 text-muted-foreground">{s[2]}</p></div></div>)}</div></Panel><div className="space-y-4"><Panel><p className="eyebrow">AI Agent</p><p className="mt-3 text-sm font-semibold">Proposes the best action</p><p className="mt-2 text-xs leading-5 text-muted-foreground">Uses failure context, customer history, and recovery patterns to rank actions.</p></Panel><Panel className="border-primary/30"><p className="eyebrow">Policy Engine</p><p className="mt-3 text-sm font-semibold">Decides what is allowed</p><p className="mt-2 text-xs leading-5 text-muted-foreground">Deterministic rules supersede model confidence. This case requires a human.</p></Panel><Panel><p className="eyebrow">Action Layer</p><p className="mt-3 text-sm font-semibold">Executes permitted actions</p><p className="mt-2 text-xs leading-5 text-muted-foreground">No action runs without a policy decision and an immutable audit entry.</p></Panel><Panel><p className="text-xs text-muted-foreground">Recovery probability</p><p className="mt-2 text-3xl font-semibold text-success">86%</p><div className="mt-3 h-1.5 rounded-full bg-secondary"><div className="h-full w-[86%] rounded-full bg-success"/></div></Panel></div></div></div>; }
-export function ApprovalsPage() { const [done,setDone]=useState<string[]>([]); const pending=cases.filter(c=>c.status==="Pending"||c.status==="Escalated"||c.status==="Blocked"); return <div className="space-y-6"><PageHeader eyebrow="Human-in-the-loop" title="Approval Queue" description="High-value or policy-sensitive recovery actions waiting for an accountable decision." action={<div className="text-right"><p className="text-2xl font-semibold text-warning">₹4.52L</p><p className="text-[11px] text-muted-foreground">value awaiting review</p></div>}/><Principle/><div className="space-y-4">{pending.map(c=><Panel key={c.id} className="overflow-hidden p-0"><div className="grid lg:grid-cols-[220px_1fr_220px]"><div className="border-b border-border p-6 lg:border-b-0 lg:border-r"><p className="font-mono text-[10px] text-muted-foreground">{c.id}</p><p className="mt-3 text-3xl font-semibold">{c.amount}</p><p className="mt-2 text-sm text-foreground">{c.customer}</p><p className="mt-1 text-xs text-muted-foreground">{c.history}</p></div><div className="grid gap-5 p-6 sm:grid-cols-2"><div><p className="eyebrow">Failure reason</p><p className="mt-2 text-sm text-foreground">{c.failure}</p><p className="mt-1 text-xs text-muted-foreground">{c.diagnosis}</p></div><div><p className="eyebrow">Expected recovery</p><p className="mt-2 text-sm text-success">{c.probability}% probability</p><p className="mt-1 text-xs text-muted-foreground">₹{Math.round(Number(c.amount.replace(/[^0-9]/g,""))*c.probability/100).toLocaleString("en-IN")} expected value</p></div><div><p className="eyebrow">AI recommendation</p><p className="mt-2 text-sm text-foreground">{c.action}</p></div><div><p className="eyebrow">Policy reason</p><p className="mt-2 text-sm text-foreground">Manual review threshold exceeded</p></div></div><div className="flex flex-row items-center gap-2 border-t border-border p-6 lg:flex-col lg:justify-center lg:border-l lg:border-t-0">{done.includes(c.id)?<div className="flex items-center gap-2 text-sm font-medium text-success"><CheckCircle2 className="size-5"/>Decision recorded</div>:<><Button className="flex-1 lg:w-full" onClick={async () => {
-  await submitApproval(c.id, "APPROVE");
-  setDone([...done, c.id]);
-}}><Check className="size-4"/>Approve</Button><Button variant="danger" className="flex-1 lg:w-full" onClick={async () => {
-  await submitApproval(c.id, "REJECT");
-  setDone([...done, c.id]);
-}}><X className="size-4"/>Reject</Button></>}</div></div></Panel>)}</div></div>; }
+export function ApprovalsPage() {
+  const [pendingCases, setPendingCases] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [completed, setCompleted] = useState<string[]>([]);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    getRecoveryCases()
+      .then((data) => setPendingCases(data.cases || []))
+      .catch((error) => console.error("Approvals loading error:", error))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const pending = (pendingCases || []).filter(
+    (c) => c.final_decision === "BLOCK" || c.final_decision === "REVIEW"
+  );
+
+  const handleDecision = async (paymentId: string, decision: "APPROVE" | "REJECT") => {
+    setBusyId(paymentId);
+    setErrors((prev) => ({ ...prev, [paymentId]: "" }));
+    try {
+      await submitApproval(paymentId, decision);
+      setCompleted((prev) => [...prev, paymentId]);
+    } catch (error: any) {
+      setErrors((prev) => ({
+        ...prev,
+        [paymentId]: error?.message || "Request failed. Please try again.",
+      }));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const inr = (n: number) => "₹" + Number(n || 0).toLocaleString("en-IN");
+  const expectedValue = (c: any) =>
+    "₹" + Math.round((c.recovery_value?.amount_at_risk || 0) * (c.recovery_value?.recovery_probability || 0)).toLocaleString("en-IN");
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Human-in-the-loop"
+        title="Approval Queue"
+        description="High-value or policy-sensitive recovery actions waiting for an accountable decision."
+        action={
+          <div className="text-right">
+            <p className="text-2xl font-semibold text-warning">
+              {inr(pending.reduce((s, c) => s + (c.recovery_value?.amount_at_risk || 0), 0))}
+            </p>
+            <p className="text-[11px] text-muted-foreground">value awaiting review</p>
+          </div>
+        }
+      />
+      <Principle />
+      <div className="space-y-4">
+        {loading ? (
+          <Panel>
+            <div className="py-12 text-center text-sm text-muted-foreground">
+              Loading approval queue...
+            </div>
+          </Panel>
+        ) : pending.length === 0 ? (
+          <Panel>
+            <div className="py-12 text-center text-sm text-muted-foreground">
+              No approval decisions currently required.
+            </div>
+          </Panel>
+        ) : (
+          pending.map((c) => (
+            <Panel key={c.payment_id} className="overflow-hidden p-0">
+              <div className="grid lg:grid-cols-[220px_1fr_220px]">
+                <div className="border-b border-border p-6 lg:border-b-0 lg:border-r">
+                  <p className="font-mono text-[10px] text-muted-foreground">{c.payment_id}</p>
+                  <p className="mt-3 text-3xl font-semibold">{inr(c.amount_inr)}</p>
+                  <p className="mt-2 text-sm text-foreground">{c.diagnosis?.root_cause?.replaceAll("_", " ")}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {c.previous_successes} successes · {c.previous_failures} failures
+                  </p>
+                </div>
+                <div className="grid gap-5 p-6 sm:grid-cols-2">
+                  <div>
+                    <p className="eyebrow">Failure reason</p>
+                    <p className="mt-2 text-sm text-foreground">{c.diagnosis?.root_cause?.replaceAll("_", " ")}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{c.diagnosis?.diagnosis}</p>
+                  </div>
+                  <div>
+                    <p className="eyebrow">Expected recovery</p>
+                    <p className="mt-2 text-sm text-success">
+                      {Math.round((c.recovery_value?.recovery_probability || 0) * 100)}% probability
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {expectedValue(c)} expected value
+                    </p>
+                  </div>
+                  <div>
+                    <p className="eyebrow">AI recommendation</p>
+                    <p className="mt-2 text-sm text-foreground">{c.ai_proposal?.proposal}</p>
+                  </div>
+                  <div>
+                    <p className="eyebrow">Policy reason</p>
+                    <p className="mt-2 text-sm text-foreground">{c.policy?.reason}</p>
+                  </div>
+                </div>
+                <div className="flex flex-row items-center gap-2 border-t border-border p-6 lg:flex-col lg:justify-center lg:border-l lg:border-t-0">
+                  {completed.includes(c.payment_id) ? (
+                    <div className="flex items-center gap-2 text-sm font-medium text-success">
+                      <CheckCircle2 className="size-5" />
+                      Decision recorded
+                    </div>
+                  ) : (
+                    <>
+                      <Button
+                        className="flex-1 lg:w-full"
+                        disabled={busyId === c.payment_id}
+                        onClick={() => handleDecision(c.payment_id, "APPROVE")}
+                      >
+                        <Check className="size-4" />
+                        {busyId === c.payment_id ? "Submitting..." : "Approve"}
+                      </Button>
+                      <Button
+                        variant="danger"
+                        className="flex-1 lg:w-full"
+                        disabled={busyId === c.payment_id}
+                        onClick={() => handleDecision(c.payment_id, "REJECT")}
+                      >
+                        <X className="size-4" />
+                        Reject
+                      </Button>
+                    </>
+                  )}
+                  {errors[c.payment_id] && (
+                    <p className="mt-2 text-xs text-danger">{errors[c.payment_id]}</p>
+                  )}
+                </div>
+              </div>
+            </Panel>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
 
 export function AnalyticsPage() { return <div className="space-y-6"><PageHeader eyebrow="Executive intelligence · Last 30 days" title="Recovery Analytics" description="Revenue outcomes, model uplift, root causes, and policy health across the recovery portfolio." action={<Button variant="secondary"><Download className="size-4"/>Download PDF</Button>}/><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Metric label="Revenue at risk" value="₹18.7L" change="2,847 payments"/><Metric label="Revenue recovered" value="₹42.6L" change="↑ 18.4%" tone="success"/><Metric label="Recovery rate" value="68.4%" change="↑ 5.2 pts"/><Metric label="Recovery uplift" value="+31.7%" change="vs baseline"/></div><div className="grid gap-6 xl:grid-cols-[1.5fr_1fr]"><Panel><SectionTitle title="Recovery trend" sub="Recovered value indexed against baseline"/><div className="mt-5 h-72"><ResponsiveContainer width="100%" height="100%"><LineChart data={trendData}><CartesianGrid stroke="var(--border)" vertical={false}/><XAxis dataKey="day" stroke="var(--muted-foreground)" tickLine={false} axisLine={false} fontSize={10}/><YAxis stroke="var(--muted-foreground)" tickLine={false} axisLine={false} fontSize={10}/><Tooltip contentStyle={tipStyle}/><Line type="monotone" dataKey="doctor" stroke="var(--primary)" strokeWidth={2.5} dot={{ fill:"var(--primary)", r:3 }}/><Line type="monotone" dataKey="naive" stroke="var(--muted-foreground)" strokeDasharray="5 5" dot={false}/></LineChart></ResponsiveContainer></div></Panel><Panel><SectionTitle title="Root-cause distribution" sub="Share of total failures"/><div className="mt-4 h-52"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={rootCauses} innerRadius={58} outerRadius={82} paddingAngle={3} dataKey="value">{rootCauses.map((r)=><Cell key={r.name} fill={r.fill}/>)}</Pie><Tooltip contentStyle={tipStyle}/></PieChart></ResponsiveContainer></div><div className="space-y-2">{rootCauses.map(r=><div key={r.name} className="flex items-center justify-between text-xs"><span className="flex items-center gap-2 text-muted-foreground"><i className="size-2 rounded-full" style={{background:r.fill}}/>{r.name}</span><span className="font-mono text-foreground">{r.value}%</span></div>)}</div></Panel></div><div className="grid gap-4 md:grid-cols-3"><Panel><p className="text-xs text-muted-foreground">Uncollectable cases</p><p className="mt-3 text-2xl font-semibold">164</p><p className="mt-2 text-xs text-danger">5.8% of failed payments</p></Panel><Panel><p className="text-xs text-muted-foreground">Policy violations prevented</p><p className="mt-3 text-2xl font-semibold">37</p><p className="mt-2 text-xs text-success">₹8.2L exposure avoided</p></Panel><Panel><p className="text-xs text-muted-foreground">Median recovery time</p><p className="mt-3 text-2xl font-semibold">19.4h</p><p className="mt-2 text-xs text-success">↓ 4.1h from baseline</p></Panel></div></div>; }
 

@@ -58,5 +58,42 @@ def log_decision(
     return record
 
 
+def log_approval(
+    payment_id: str,
+    decision: str,
+    policy_decision: str,
+    action: dict[str, Any] | None = None,
+    message: str = "",
+) -> dict[str, Any]:
+    """Record a human-in-the-loop approval/rejection decision.
+
+    Backward compatible: appends a standalone record and never mutates
+    existing decision records written by ``log_decision``.
+    """
+
+    record: dict[str, Any] = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "payment_id": payment_id,
+        "event": "HUMAN_APPROVAL",
+        "decision": decision,
+        "policy_decision": policy_decision,
+    }
+
+    if action is not None:
+        record["action"] = action
+
+    if message:
+        record["message"] = message
+
+    records = _load_records()
+    records.append(record)
+
+    AUDIT_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with open(AUDIT_FILE, "w", encoding="utf-8") as file:
+        json.dump(records, file, indent=2)
+
+    return record
+
+
 def get_audit_logs() -> list[dict[str, Any]]:
     return _load_records()

@@ -1,0 +1,1 @@
+import{n as e}from"./pages-DOGTshXJ.js";var t=e;export{t as component};
