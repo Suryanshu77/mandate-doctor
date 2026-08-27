@@ -16,6 +16,7 @@ import { Route as AuditReplayRouteImport } from './routes/audit-replay'
 import { Route as RecoveryCasesRouteImport } from './routes/recovery-cases'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as RecoveryCasesIndexRouteImport } from './routes/recovery-cases.index'
+import { Route as RecoveryCasesCaseIdRouteImport } from './routes/recovery-cases.$caseId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -52,6 +53,11 @@ const RecoveryCasesIndexRoute = RecoveryCasesIndexRouteImport.update({
   path: '/',
   getParentRoute: () => RecoveryCasesRoute,
 } as any)
+const RecoveryCasesCaseIdRoute = RecoveryCasesCaseIdRouteImport.update({
+  id: '/$caseId',
+  path: '/$caseId',
+  getParentRoute: () => RecoveryCasesRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -60,6 +66,7 @@ export interface FileRoutesByFullPath {
   '/audit-replay': typeof AuditReplayRoute
   '/recovery-cases': typeof RecoveryCasesRouteWithChildren
   '/settings': typeof SettingsRoute
+  '/recovery-cases/$caseId': typeof RecoveryCasesCaseIdRoute
   '/recovery-cases/': typeof RecoveryCasesIndexRoute
 }
 export interface FileRoutesByTo {
@@ -68,6 +75,7 @@ export interface FileRoutesByTo {
   '/approvals': typeof ApprovalsRoute
   '/audit-replay': typeof AuditReplayRoute
   '/settings': typeof SettingsRoute
+  '/recovery-cases/$caseId': typeof RecoveryCasesCaseIdRoute
   '/recovery-cases': typeof RecoveryCasesIndexRoute
 }
 export interface FileRoutesById {
@@ -78,6 +86,7 @@ export interface FileRoutesById {
   '/audit-replay': typeof AuditReplayRoute
   '/recovery-cases': typeof RecoveryCasesRouteWithChildren
   '/settings': typeof SettingsRoute
+  '/recovery-cases/$caseId': typeof RecoveryCasesCaseIdRoute
   '/recovery-cases/': typeof RecoveryCasesIndexRoute
 }
 export interface FileRouteTypes {
@@ -89,6 +98,7 @@ export interface FileRouteTypes {
     | '/audit-replay'
     | '/recovery-cases'
     | '/settings'
+    | '/recovery-cases/$caseId'
     | '/recovery-cases/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -97,6 +107,7 @@ export interface FileRouteTypes {
     | '/approvals'
     | '/audit-replay'
     | '/settings'
+    | '/recovery-cases/$caseId'
     | '/recovery-cases'
   id:
     | '__root__'
@@ -106,6 +117,7 @@ export interface FileRouteTypes {
     | '/audit-replay'
     | '/recovery-cases'
     | '/settings'
+    | '/recovery-cases/$caseId'
     | '/recovery-cases/'
   fileRoutesById: FileRoutesById
 }
@@ -169,14 +181,23 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RecoveryCasesIndexRouteImport
       parentRoute: typeof RecoveryCasesRoute
     }
+    '/recovery-cases/$caseId': {
+      id: '/recovery-cases/$caseId'
+      path: '/$caseId'
+      fullPath: '/recovery-cases/$caseId'
+      preLoaderRoute: typeof RecoveryCasesCaseIdRouteImport
+      parentRoute: typeof RecoveryCasesRoute
+    }
   }
 }
 
 interface RecoveryCasesRouteChildren {
+  RecoveryCasesCaseIdRoute: typeof RecoveryCasesCaseIdRoute
   RecoveryCasesIndexRoute: typeof RecoveryCasesIndexRoute
 }
 
 const RecoveryCasesRouteChildren: RecoveryCasesRouteChildren = {
+  RecoveryCasesCaseIdRoute: RecoveryCasesCaseIdRoute,
   RecoveryCasesIndexRoute: RecoveryCasesIndexRoute,
 }
 

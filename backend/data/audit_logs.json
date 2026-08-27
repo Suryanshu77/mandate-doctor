@@ -1,0 +1,27 @@
+[
+  {
+    "timestamp": "2026-08-27T17:06:43.461836+00:00",
+    "payment_id": "pay_test_edb7f0426598",
+    "diagnosis": {
+      "root_cause": "BANK_TIMEOUT",
+      "diagnosis": "The payment attempt encountered a temporary bank or network timeout.",
+      "confidence": 0.95,
+      "recoverable": true,
+      "recommended_action": "RETRY_LATER",
+      "reason": "Temporary failures may succeed after a cooling-off period."
+    },
+    "ai_proposal": {
+      "action": "RETRY_LATER",
+      "proposal": "Retry the payment after a cooling-off period.",
+      "retry_after_hours": 12,
+      "confidence": 0.91
+    },
+    "policy": {
+      "decision": "APPROVE",
+      "reason": "Recovery action 'RETRY_LATER' is within policy.",
+      "allowed": true,
+      "requires_human_approval": false
+    },
+    "final_decision": "APPROVE"
+  }
+]

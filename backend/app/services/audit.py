@@ -1,8 +1,30 @@
+import json
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 
-AUDIT_LOG: list[dict[str, Any]] = []
+AUDIT_FILE = (
+    Path(__file__).resolve().parents[2]
+    / "data"
+    / "audit_logs.json"
+)
+
+
+def _load_records() -> list[dict[str, Any]]:
+    if not AUDIT_FILE.exists():
+        return []
+
+    try:
+        with open(AUDIT_FILE, "r", encoding="utf-8") as file:
+            records = json.load(file)
+    except (json.JSONDecodeError, OSError, ValueError):
+        return []
+
+    if not isinstance(records, list):
+        return []
+
+    return records
 
 
 def log_decision(
@@ -22,10 +44,15 @@ def log_decision(
         "final_decision": final_decision,
     }
 
-    AUDIT_LOG.append(record)
+    records = _load_records()
+    records.append(record)
+
+    AUDIT_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with open(AUDIT_FILE, "w", encoding="utf-8") as file:
+        json.dump(records, file, indent=2)
 
     return record
 
 
 def get_audit_logs() -> list[dict[str, Any]]:
-    return AUDIT_LOG
+    return _load_records()
