@@ -1,1 +1,0 @@
-import{c as e,o as t}from"./index-osgbBhnB.js";var n=e(),r=()=>(0,n.jsx)(t,{});export{r as component};

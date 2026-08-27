@@ -507,12 +507,12 @@ export function ApprovalsPage() {
 
 export function AnalyticsPage() { return <div className="space-y-6"><PageHeader eyebrow="Executive intelligence · Last 30 days" title="Recovery Analytics" description="Revenue outcomes, model uplift, root causes, and policy health across the recovery portfolio." action={<Button variant="secondary"><Download className="size-4"/>Download PDF</Button>}/><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Metric label="Revenue at risk" value="₹18.7L" change="2,847 payments"/><Metric label="Revenue recovered" value="₹42.6L" change="↑ 18.4%" tone="success"/><Metric label="Recovery rate" value="68.4%" change="↑ 5.2 pts"/><Metric label="Recovery uplift" value="+31.7%" change="vs baseline"/></div><div className="grid gap-6 xl:grid-cols-[1.5fr_1fr]"><Panel><SectionTitle title="Recovery trend" sub="Recovered value indexed against baseline"/><div className="mt-5 h-72"><ResponsiveContainer width="100%" height="100%"><LineChart data={trendData}><CartesianGrid stroke="var(--border)" vertical={false}/><XAxis dataKey="day" stroke="var(--muted-foreground)" tickLine={false} axisLine={false} fontSize={10}/><YAxis stroke="var(--muted-foreground)" tickLine={false} axisLine={false} fontSize={10}/><Tooltip contentStyle={tipStyle}/><Line type="monotone" dataKey="doctor" stroke="var(--primary)" strokeWidth={2.5} dot={{ fill:"var(--primary)", r:3 }}/><Line type="monotone" dataKey="naive" stroke="var(--muted-foreground)" strokeDasharray="5 5" dot={false}/></LineChart></ResponsiveContainer></div></Panel><Panel><SectionTitle title="Root-cause distribution" sub="Share of total failures"/><div className="mt-4 h-52"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={rootCauses} innerRadius={58} outerRadius={82} paddingAngle={3} dataKey="value">{rootCauses.map((r)=><Cell key={r.name} fill={r.fill}/>)}</Pie><Tooltip contentStyle={tipStyle}/></PieChart></ResponsiveContainer></div><div className="space-y-2">{rootCauses.map(r=><div key={r.name} className="flex items-center justify-between text-xs"><span className="flex items-center gap-2 text-muted-foreground"><i className="size-2 rounded-full" style={{background:r.fill}}/>{r.name}</span><span className="font-mono text-foreground">{r.value}%</span></div>)}</div></Panel></div><div className="grid gap-4 md:grid-cols-3"><Panel><p className="text-xs text-muted-foreground">Uncollectable cases</p><p className="mt-3 text-2xl font-semibold">164</p><p className="mt-2 text-xs text-danger">5.8% of failed payments</p></Panel><Panel><p className="text-xs text-muted-foreground">Policy violations prevented</p><p className="mt-3 text-2xl font-semibold">37</p><p className="mt-2 text-xs text-success">₹8.2L exposure avoided</p></Panel><Panel><p className="text-xs text-muted-foreground">Median recovery time</p><p className="mt-3 text-2xl font-semibold">19.4h</p><p className="mt-2 text-xs text-success">↓ 4.1h from baseline</p></Panel></div></div>; }
 
-const audit = [{time:"14:32:09",case:"RC-2048",event:"Failure",detail:"LIMIT_EXCEEDED returned by HDFC Bank",tone:"danger"},{time:"14:32:10",case:"RC-2048",event:"Diagnosis",detail:"Daily debit ceiling identified",tone:"ai"},{time:"14:32:11",case:"RC-2048",event:"AI Proposal",detail:"Retry tomorrow at 09:30 IST",tone:"ai"},{time:"14:32:12",case:"RC-2048",event:"Policy Decision",detail:"Human approval required above ₹75,000",tone:"policy"},{time:"14:32:13",case:"RC-2048",event:"Action",detail:"Execution paused pending approval",tone:"warning"},{time:"14:32:13",case:"RC-2048",event:"Outcome",detail:"Decision pending",tone:"warning"}];
 export function AuditReplayPage() {
   const [logs, setLogs] = useState<any[]>([]);
   const [selected, setSelected] = useState<any>(null);
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     getAuditLogs()
@@ -524,10 +524,34 @@ export function AuditReplayPage() {
         }
       })
       .catch((error) => {
+        setError("Failed to load audit records.");
         console.error("Audit error:", error);
       })
       .finally(() => setLoading(false));
   }, []);
+
+  const actionLines =
+    selected.action &&
+    (selected.action.action !== undefined ||
+      selected.action.status !== undefined)
+      ? [
+          selected.action.action !== undefined
+            ? `Action: ${selected.action.action}`
+            : null,
+          selected.action.status !== undefined
+            ? `Status: ${selected.action.status}`
+            : null,
+          selected.action.simulated !== undefined
+            ? `Simulated: ${selected.action.simulated ? "yes" : "no"}`
+            : null,
+          selected.action.message
+            ? `Message: ${selected.action.message}`
+            : null,
+          selected.action.retry_after_hours != null
+            ? `Retry after: ${selected.action.retry_after_hours}h`
+            : null,
+        ].filter(Boolean)
+      : ["No action layer result recorded."];
 
   const replaySteps = selected
     ? [
@@ -555,8 +579,18 @@ export function AuditReplayPage() {
         },
         {
           title: "Final Decision",
-          detail: `Recovery decision: ${selected.final_decision}`,
+          detail: selected.final_decision
+            ? `Recovery decision: ${selected.final_decision}`
+            : selected.decision
+              ? `Human decision: ${selected.decision}`
+              : "Decision recorded.",
           tone: "pending",
+        },
+        {
+          title: "Action Result",
+          detail: "Action Layer outcome",
+          tone: "result",
+          lines: actionLines,
         },
       ]
     : [];
@@ -568,8 +602,15 @@ export function AuditReplayPage() {
         title="Audit Replay"
         description="Search and replay every inference, rule evaluation, action, and financial outcome."
         action={
-          <Badge status={selected?.final_decision === "APPROVE" ? "Success" : "Pending"}>
-            {selected ? selected.final_decision : "NO TRACE"}
+          <Badge
+            status={
+              selected?.final_decision === "APPROVE" ||
+              selected?.decision === "APPROVE"
+                ? "Success"
+                : "Pending"
+            }
+          >
+            {selected ? selected.final_decision || selected.decision : "NO TRACE"}
           </Badge>
         }
       />
@@ -577,19 +618,16 @@ export function AuditReplayPage() {
       <Panel>
         <div className="flex flex-col gap-3 sm:flex-row">
           <select
-            value={selected?.payment_id || ""}
+            value={selected ? String(logs.indexOf(selected)) : ""}
             onChange={(e) => {
-              const log = logs.find(
-                (item) => item.payment_id === e.target.value
-              );
-              setSelected(log || null);
+              setSelected(logs[Number(e.target.value)] || null);
             }}
             className="h-10 flex-1 rounded-lg border border-border bg-secondary px-3 text-sm outline-none"
           >
             <option value="">Select audit record</option>
 
             {logs.map((log, index) => (
-              <option key={`${log.payment_id}-${index}`} value={log.payment_id}>
+              <option key={`${log.payment_id}-${index}`} value={String(index)}>
                 {log.payment_id}
               </option>
             ))}
@@ -609,7 +647,13 @@ export function AuditReplayPage() {
         </div>
       </Panel>
 
-      {loading ? (
+      {error ? (
+        <Panel>
+          <p className="py-12 text-center text-sm text-danger">
+            {error}
+          </p>
+        </Panel>
+      ) : loading ? (
         <Panel>
           <div className="py-12 text-center text-sm text-muted-foreground">
             Loading audit records...
@@ -634,7 +678,7 @@ export function AuditReplayPage() {
                 <div
                   key={step.title}
                   className={`grid grid-cols-[20px_minmax(0,1fr)] gap-3 rounded-lg p-3 transition-all ${
-                    playing && index < 4 ? "bg-accent" : ""
+                    playing ? "bg-accent" : ""
                   }`}
                 >
                   <div className="relative flex justify-center">
@@ -646,7 +690,9 @@ export function AuditReplayPage() {
                             ? "bg-primary"
                             : step.tone === "ai"
                               ? "bg-ai"
-                              : "bg-warning"
+                              : step.tone === "result"
+                                ? "bg-success"
+                                : "bg-warning"
                       }`}
                     />
 
@@ -660,9 +706,20 @@ export function AuditReplayPage() {
                       {step.title}
                     </p>
 
-                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                      {step.detail}
-                    </p>
+                    {step.lines ? (
+                      step.lines.map((line, i) => (
+                        <p
+                          key={i}
+                          className="mt-1 text-xs leading-5 text-muted-foreground"
+                        >
+                          {line}
+                        </p>
+                      ))
+                    ) : (
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                        {step.detail}
+                      </p>
+                    )}
                   </div>
                 </div>
               ))}
@@ -689,12 +746,13 @@ export function AuditReplayPage() {
               <div className="mt-4">
                 <Badge
                   status={
-                    selected.final_decision === "APPROVE"
+                    selected.final_decision === "APPROVE" ||
+                    selected.decision === "APPROVE"
                       ? "Success"
                       : "Pending"
                   }
                 >
-                  {selected.final_decision}
+                  {selected.final_decision || selected.decision}
                 </Badge>
               </div>
 
