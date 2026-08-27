@@ -38,6 +38,7 @@ def get_cases():
             "policy": result["policy"],
             "final_decision": result["final_decision"],
             "recovery_value": result["recovery_value"],
+            "action": result["action"],
         })
 
     return {

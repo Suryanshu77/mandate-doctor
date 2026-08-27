@@ -33,6 +33,7 @@ def log_decision(
     ai_proposal: dict[str, Any],
     policy: dict[str, Any],
     final_decision: str,
+    action: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
 
     record = {
@@ -43,6 +44,9 @@ def log_decision(
         "policy": policy,
         "final_decision": final_decision,
     }
+
+    if action is not None:
+        record["action"] = action
 
     records = _load_records()
     records.append(record)

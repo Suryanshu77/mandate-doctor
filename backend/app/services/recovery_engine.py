@@ -1,5 +1,6 @@
 from typing import Any
 
+from app.services.action_layer import execute_action
 from app.services.audit import log_decision
 from app.services.diagnosis import diagnose_payment
 from app.services.recovery_agent import generate_proposal
@@ -29,12 +30,20 @@ def make_recovery_decision(payment: dict[str, Any]) -> dict[str, Any]:
         diagnosis=diagnosis,
     )
 
+    action = execute_action(
+        payment_id=payment.get("payment_id"),
+        proposed_action=proposal.get("action"),
+        policy_decision=final_decision,
+        recovery_info=proposal,
+    )
+
     audit = log_decision(
         payment_id=payment.get("payment_id"),
         diagnosis=diagnosis,
         ai_proposal=proposal,
         policy=policy,
         final_decision=final_decision,
+        action=action,
     )
 
     return {
@@ -45,5 +54,6 @@ def make_recovery_decision(payment: dict[str, Any]) -> dict[str, Any]:
         "policy": policy,
         "recovery_value": recovery_value,
         "final_decision": final_decision,
+        "action": action,
         "audit_id": audit["timestamp"],
     }
