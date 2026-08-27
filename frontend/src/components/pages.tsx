@@ -5,6 +5,7 @@ import { Activity, ArrowRight, BrainCircuit, Check, CheckCircle2, ChevronRight, 
 import { cases, rootCauses, trendData, type RecoveryCase } from "../lib/mock-data";
 import { Badge, Button, Metric, PageHeader, Panel } from "./ui";
 import {
+  getAnalytics,
   getAuditLogs,
   getOverviewMetrics,
   getRecoveryCases,
@@ -505,7 +506,156 @@ export function ApprovalsPage() {
 }
 
 
-export function AnalyticsPage() { return <div className="space-y-6"><PageHeader eyebrow="Executive intelligence · Last 30 days" title="Recovery Analytics" description="Revenue outcomes, model uplift, root causes, and policy health across the recovery portfolio." action={<Button variant="secondary"><Download className="size-4"/>Download PDF</Button>}/><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Metric label="Revenue at risk" value="₹18.7L" change="2,847 payments"/><Metric label="Revenue recovered" value="₹42.6L" change="↑ 18.4%" tone="success"/><Metric label="Recovery rate" value="68.4%" change="↑ 5.2 pts"/><Metric label="Recovery uplift" value="+31.7%" change="vs baseline"/></div><div className="grid gap-6 xl:grid-cols-[1.5fr_1fr]"><Panel><SectionTitle title="Recovery trend" sub="Recovered value indexed against baseline"/><div className="mt-5 h-72"><ResponsiveContainer width="100%" height="100%"><LineChart data={trendData}><CartesianGrid stroke="var(--border)" vertical={false}/><XAxis dataKey="day" stroke="var(--muted-foreground)" tickLine={false} axisLine={false} fontSize={10}/><YAxis stroke="var(--muted-foreground)" tickLine={false} axisLine={false} fontSize={10}/><Tooltip contentStyle={tipStyle}/><Line type="monotone" dataKey="doctor" stroke="var(--primary)" strokeWidth={2.5} dot={{ fill:"var(--primary)", r:3 }}/><Line type="monotone" dataKey="naive" stroke="var(--muted-foreground)" strokeDasharray="5 5" dot={false}/></LineChart></ResponsiveContainer></div></Panel><Panel><SectionTitle title="Root-cause distribution" sub="Share of total failures"/><div className="mt-4 h-52"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={rootCauses} innerRadius={58} outerRadius={82} paddingAngle={3} dataKey="value">{rootCauses.map((r)=><Cell key={r.name} fill={r.fill}/>)}</Pie><Tooltip contentStyle={tipStyle}/></PieChart></ResponsiveContainer></div><div className="space-y-2">{rootCauses.map(r=><div key={r.name} className="flex items-center justify-between text-xs"><span className="flex items-center gap-2 text-muted-foreground"><i className="size-2 rounded-full" style={{background:r.fill}}/>{r.name}</span><span className="font-mono text-foreground">{r.value}%</span></div>)}</div></Panel></div><div className="grid gap-4 md:grid-cols-3"><Panel><p className="text-xs text-muted-foreground">Uncollectable cases</p><p className="mt-3 text-2xl font-semibold">164</p><p className="mt-2 text-xs text-danger">5.8% of failed payments</p></Panel><Panel><p className="text-xs text-muted-foreground">Policy violations prevented</p><p className="mt-3 text-2xl font-semibold">37</p><p className="mt-2 text-xs text-success">₹8.2L exposure avoided</p></Panel><Panel><p className="text-xs text-muted-foreground">Median recovery time</p><p className="mt-3 text-2xl font-semibold">19.4h</p><p className="mt-2 text-xs text-success">↓ 4.1h from baseline</p></Panel></div></div>; }
+export function AnalyticsPage() {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    getAnalytics()
+      .then(setData)
+      .catch((e) => {
+        setError("Failed to load analytics.");
+        console.error("Analytics error:", e);
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  const fmtLakh = (n: number) =>
+    "₹" +
+    (Number(n || 0) / 100000).toLocaleString("en-IN", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }) +
+    "L";
+
+  const palette = [
+    "var(--chart-1)",
+    "var(--chart-2)",
+    "var(--chart-3)",
+    "var(--chart-4)",
+    "var(--chart-5)",
+    "var(--primary)",
+    "var(--ai)",
+    "var(--warning)",
+  ];
+
+  const rootCauses = data
+    ? Object.entries(data.diagnosis_counts || {}).map(
+        ([key, val]: any, idx: number) => ({
+          name: key
+            .replaceAll("_", " ")
+            .toLowerCase()
+            .replace(/\b\w/g, (c) => c.toUpperCase()),
+          value: Math.round((val / (data.total_records || 1)) * 100),
+          fill: palette[idx % palette.length],
+        })
+      )
+    : [];
+
+  const trend = data?.recovery_trend || [];
+
+  const approvedRate = data
+    ? ((data.approved_recoveries / (data.total_records || 1)) * 100).toFixed(1)
+    : "0";
+
+  const blockedRate = data
+    ? ((data.blocked_recoveries / (data.total_records || 1)) * 100).toFixed(1)
+    : "0";
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Executive intelligence · Last 30 days"
+        title="Recovery Analytics"
+        description="Revenue outcomes, model uplift, root causes, and policy health across the recovery portfolio."
+        action={<Button variant="secondary"><Download className="size-4" />Download PDF</Button>}
+      />
+
+      {loading ? (
+        <Panel>
+          <div className="py-12 text-center text-sm text-muted-foreground">
+            Loading analytics...
+          </div>
+        </Panel>
+      ) : error ? (
+        <Panel>
+          <p className="py-12 text-center text-sm text-danger">{error}</p>
+        </Panel>
+      ) : (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <Metric label="Revenue at risk" value={fmtLakh(data.revenue_at_risk)} change={`${data.total_records} records`} />
+            <Metric label="Revenue recovered" value={fmtLakh(data.expected_recovery)} change="expected recovery" tone="success" />
+            <Metric label="Recovery rate" value={`${data.expected_recovery_rate}%`} change="of revenue at risk" />
+            <Metric label="Recovery uplift" value={`${approvedRate}%`} change="approved recovery rate" />
+          </div>
+
+          <div className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">
+            <Panel>
+              <SectionTitle title="Recovery trend" sub="Recovered value indexed against baseline" />
+              <div className="mt-5 h-72">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={trend}>
+                    <CartesianGrid stroke="var(--border)" vertical={false} />
+                    <XAxis dataKey="day" stroke="var(--muted-foreground)" tickLine={false} axisLine={false} fontSize={10} />
+                    <YAxis stroke="var(--muted-foreground)" tickLine={false} axisLine={false} fontSize={10} />
+                    <Tooltip contentStyle={tipStyle} />
+                    <Line type="monotone" dataKey="doctor" stroke="var(--primary)" strokeWidth={2.5} dot={{ fill: "var(--primary)", r: 3 }} />
+                    <Line type="monotone" dataKey="naive" stroke="var(--muted-foreground)" strokeDasharray="5 5" dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </Panel>
+            <Panel>
+              <SectionTitle title="Root-cause distribution" sub="Share of total failures" />
+              <div className="mt-4 h-52">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={rootCauses} innerRadius={58} outerRadius={82} paddingAngle={3} dataKey="value">
+                      {rootCauses.map((r) => <Cell key={r.name} fill={r.fill} />)}
+                    </Pie>
+                    <Tooltip contentStyle={tipStyle} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="space-y-2">
+                {rootCauses.map((r) => (
+                  <div key={r.name} className="flex items-center justify-between text-xs">
+                    <span className="flex items-center gap-2 text-muted-foreground">
+                      <i className="size-2 rounded-full" style={{ background: r.fill }} />
+                      {r.name}
+                    </span>
+                    <span className="font-mono text-foreground">{r.value}%</span>
+                  </div>
+                ))}
+              </div>
+            </Panel>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            <Panel>
+              <p className="text-xs text-muted-foreground">Uncollectable cases</p>
+              <p className="mt-3 text-2xl font-semibold">{data.blocked_recoveries}</p>
+              <p className="mt-2 text-xs text-danger">{blockedRate}% of records</p>
+            </Panel>
+            <Panel>
+              <p className="text-xs text-muted-foreground">Policy violations prevented</p>
+              <p className="mt-3 text-2xl font-semibold">{data.blocked_recoveries}</p>
+              <p className="mt-2 text-xs text-success">{fmtLakh(data.blocked_at_risk)} exposure avoided</p>
+            </Panel>
+            <Panel>
+              <p className="text-xs text-muted-foreground">Median recovery time</p>
+              <p className="mt-3 text-2xl font-semibold">19.4h</p>
+              <p className="mt-2 text-xs text-success">↑4.1h from baseline</p>
+            </Panel>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 
 export function AuditReplayPage() {
   const [logs, setLogs] = useState<any[]>([]);

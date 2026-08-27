@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from app.api.diagnosis import router as diagnosis_router
 from app.api.cases import router as cases_router
 from app.api.audit import router as audit_router
+from app.api.metrics import router as metrics_router
 from app.services.action_layer import execute_action
 from app.services.audit import log_approval
 from app.services.recovery_pipeline import get_overview, get_recovery_cases
@@ -41,6 +42,7 @@ def overview():
 app.include_router(diagnosis_router)
 app.include_router(cases_router)
 app.include_router(audit_router)
+app.include_router(metrics_router)
 
 
 class ApprovalRequest(BaseModel):

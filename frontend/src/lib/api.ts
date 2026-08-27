@@ -12,6 +12,18 @@ export async function getOverviewMetrics() {
   return response.json();
 }
 
+export async function getAnalytics() {
+  const response = await fetch(
+    `${API_BASE_URL}/api/metrics/analytics`
+  );
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch analytics");
+  }
+
+  return response.json();
+}
+
 export async function getRecoveryCases() {
   const response = await fetch(
     `${API_BASE_URL}/api/cases`
