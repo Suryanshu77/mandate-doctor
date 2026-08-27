@@ -1,0 +1,2 @@
+import { createFileRoute } from "@tanstack/react-router"; import { AnalyticsPage } from "../components/pages";
+export const Route=createFileRoute("/analytics")({head:()=>({meta:[{title:"Analytics — Mandate Doctor"},{name:"description",content:"Executive recovery analytics and policy health."},{property:"og:title",content:"Recovery Analytics — Mandate Doctor"},{property:"og:description",content:"Revenue recovery performance and root-cause intelligence."},{property:"og:type",content:"website"},{name:"twitter:card",content:"summary_large_image"}]}),component:AnalyticsPage});

@@ -1,0 +1,2 @@
+import { createFileRoute } from "@tanstack/react-router"; import { ApprovalsPage } from "../components/pages";
+export const Route=createFileRoute("/approvals")({head:()=>({meta:[{title:"Approvals — Mandate Doctor"},{name:"description",content:"Review high-value payment recovery actions."},{property:"og:title",content:"Recovery Approvals — Mandate Doctor"},{property:"og:description",content:"Make accountable high-value recovery decisions."},{property:"og:type",content:"website"},{name:"twitter:card",content:"summary_large_image"}]}),component:ApprovalsPage});

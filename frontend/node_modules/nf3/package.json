@@ -1,0 +1,53 @@
+{
+  "name": "nf3",
+  "version": "0.3.24",
+  "description": "",
+  "license": "MIT",
+  "repository": "unjs/nf3",
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": "./dist/index.mjs",
+    "./db": "./dist/db.mjs",
+    "./plugin": "./dist/plugin.mjs"
+  },
+  "scripts": {
+    "bench": "bun scripts/bench-trace.ts",
+    "build": "obuild",
+    "dev": "vitest dev",
+    "lint": "oxlint . && oxfmt --check .",
+    "fmt": "automd && oxlint . --fix && oxfmt .",
+    "prepack": "pnpm build",
+    "release": "pnpm test && pnpm build && changelogen --release && npm publish && git push --follow-tags",
+    "test": "pnpm lint && pnpm test:types && vitest run --coverage",
+    "test:types": "tsc --noEmit --skipLibCheck"
+  },
+  "devDependencies": {
+    "@rollup/plugin-node-resolve": "^16.0.3",
+    "@types/node": "^26.2.0",
+    "@types/semver": "^7.8.0",
+    "@vercel/nft": "^1.11.0",
+    "@vitest/coverage-v8": "^4.1.11",
+    "automd": "^0.4.3",
+    "changelogen": "^0.6.2",
+    "eslint-config-unjs": "^0.6.2",
+    "exsolve": "^1.1.1",
+    "obuild": "^0.4.38",
+    "oxc-minify": "^0.146.0",
+    "oxfmt": "^0.64.0",
+    "oxlint": "^1.79.0",
+    "pathe": "^2.0.3",
+    "pkg-types": "^2.3.1",
+    "rolldown": "^1.2.5",
+    "rollup": "^4.62.4",
+    "rollup-plugin-esbuild": "^6.2.1",
+    "semver": "^7.8.5",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
+  },
+  "packageManager": "pnpm@11.10.0"
+}

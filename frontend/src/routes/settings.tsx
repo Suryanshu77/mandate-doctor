@@ -1,0 +1,2 @@
+import { createFileRoute } from "@tanstack/react-router"; import { SettingsPage } from "../components/pages";
+export const Route=createFileRoute("/settings")({head:()=>({meta:[{title:"Settings — Mandate Doctor"},{name:"description",content:"Configure deterministic recovery policies and limits."},{property:"og:title",content:"Recovery Settings — Mandate Doctor"},{property:"og:description",content:"Configure safe AI recovery guardrails."},{property:"og:type",content:"website"},{name:"twitter:card",content:"summary_large_image"}]}),component:SettingsPage});

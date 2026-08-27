@@ -1,0 +1,5 @@
+import { CloudflareFetchHandler, Server, ServerOptions } from "../_chunks/types.mjs";
+declare const FastURL: typeof globalThis.URL;
+declare const FastResponse: typeof globalThis.Response;
+declare function serve(options: ServerOptions): Server<CloudflareFetchHandler>;
+export { FastResponse, FastURL, serve };
