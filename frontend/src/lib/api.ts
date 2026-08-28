@@ -69,3 +69,41 @@ export async function getAuditLogs() {
 
   return response.json();
 }
+
+export interface Settings {
+  retry_limit: number;
+  cooling_off_hours: number;
+  human_approval_threshold: number;
+  max_contact_attempts: number;
+  kill_switch: boolean;
+}
+
+export async function getSettings(): Promise<Settings> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/settings`
+  );
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch settings");
+  }
+
+  return response.json();
+}
+
+export async function updateSettings(
+  settings: Settings
+): Promise<Settings> {
+  const response = await fetch(`${API_BASE_URL}/api/settings`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(settings),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to save settings");
+  }
+
+  return response.json();
+}

@@ -1,8 +1,8 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useParams } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Area, AreaChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Activity, ArrowRight, BrainCircuit, Check, CheckCircle2, ChevronRight, CircleDollarSign, Clock3, Download, Filter, Gauge, History, Pause, Play, RotateCcw, Search, ShieldCheck, SlidersHorizontal, Sparkles, TrendingUp, UserCheck, X, Zap } from "lucide-react";
-import { cases, rootCauses, trendData, type RecoveryCase } from "../lib/mock-data";
+import { rootCauses, trendData, type RecoveryCase } from "../lib/mock-data";
 import { Badge, Button, Metric, PageHeader, Panel } from "./ui";
 import {
   getAnalytics,
@@ -20,7 +20,7 @@ const funnel = [{ label: "Failed", value: "2,847", width: "100%" }, { label: "Di
 
 function Principle() { return <div className="flex items-center gap-3 rounded-lg border border-ai/20 bg-ai-soft px-4 py-3"><BrainCircuit className="size-4 shrink-0 text-ai"/><p className="text-xs text-muted-foreground"><strong className="text-foreground">The AI proposes.</strong> The Policy Engine decides.</p></div>; }
 function SectionTitle({ title, sub, action }: { title: string; sub: string; action?: React.ReactNode }) { return <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4"><div className="min-w-0"><h2 className="text-base font-semibold text-foreground">{title}</h2><p className="mt-1 text-xs text-muted-foreground">{sub}</p></div>{action}</div>; }
-function CasesTable({ rows = cases }: { rows?: RecoveryCase[] }) { return <div className="mt-5 overflow-x-auto"><table className="w-full min-w-[880px] text-left"><thead><tr className="border-b border-border text-[10px] uppercase tracking-[0.1em] text-muted-foreground"><th className="pb-3 font-medium">Payment</th><th className="pb-3 font-medium">Amount</th><th className="pb-3 font-medium">Failure</th><th className="pb-3 font-medium">Diagnosis</th><th className="pb-3 font-medium">Action</th><th className="pb-3 font-medium">Status</th><th/></tr></thead><tbody>{rows.map((c) => <tr key={c.id} className="group border-b border-border/60 text-sm last:border-0 hover:bg-accent/30"><td className="py-4"><p className="font-mono text-xs text-foreground">{c.payment}</p><p className="mt-1 text-[11px] text-muted-foreground">{c.customer}</p></td><td className="py-4 font-medium text-foreground">{c.amount}</td><td className="py-4 text-muted-foreground">{c.failure}</td><td className="max-w-52 py-4 text-muted-foreground">{c.diagnosis}</td><td className="max-w-52 py-4 text-muted-foreground">{c.action}</td><td className="py-4"><Badge status={c.status}/></td><td className="py-4"><Link to="/recovery-cases/$caseId" params={{ caseId: c.id }} aria-label={`View ${c.id}`} className="grid size-8 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"><ChevronRight className="size-4"/></Link></td></tr>)}</tbody></table></div>; }
+function CasesTable({ rows }: { rows: RecoveryCase[] }) { return <div className="mt-5 overflow-x-auto"><table className="w-full min-w-[880px] text-left"><thead><tr className="border-b border-border text-[10px] uppercase tracking-[0.1em] text-muted-foreground"><th className="pb-3 font-medium">Payment</th><th className="pb-3 font-medium">Amount</th><th className="pb-3 font-medium">Failure</th><th className="pb-3 font-medium">Diagnosis</th><th className="pb-3 font-medium">Action</th><th className="pb-3 font-medium">Status</th><th/></tr></thead><tbody>{rows.map((c) => <tr key={c.id} className="group border-b border-border/60 text-sm last:border-0 hover:bg-accent/30"><td className="py-4"><p className="font-mono text-xs text-foreground">{c.payment}</p><p className="mt-1 text-[11px] text-muted-foreground">{c.customer}</p></td><td className="py-4 font-medium text-foreground">{c.amount}</td><td className="py-4 text-muted-foreground">{c.failure}</td><td className="max-w-52 py-4 text-muted-foreground">{c.diagnosis}</td><td className="max-w-52 py-4 text-muted-foreground">{c.action}</td><td className="py-4"><Badge status={c.status}/></td><td className="py-4"><Link to="/recovery-cases/$caseId" params={{ caseId: c.id }} aria-label={`View ${c.id}`} className="grid size-8 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"><ChevronRight className="size-4"/></Link></td></tr>)}</tbody></table></div>; }
 function formatRecoveryCase(c: any): RecoveryCase {
   return {
     id: c.payment_id,
@@ -358,13 +358,294 @@ export function RecoveryCasesPage() {
     </div>
   );
 }
-const steps = [
-  ["Payment Failed","02:41:08","Bank returned LIMIT_EXCEEDED","failure"], ["Root Cause Detected","02:41:09","Daily debit ceiling reached; not a permanent mandate failure","ai"],
-  ["Customer History Analyzed","02:41:10","18 successful renewals and only one prior soft decline","ai"], ["Recovery Probability","02:41:11","86% likelihood if retried after daily limit resets","ai"],
-  ["AI Proposal","02:41:12","Retry once tomorrow at 09:30 IST; suppress customer contact","ai"], ["Policy Decision","02:41:12","Human approval required: amount exceeds ₹75,000 threshold","policy"],
-  ["Action Executed","Pending","Queued until approval is recorded","action"], ["Recovery Result","Pending","Awaiting permitted execution","pending"],
-];
-export function CaseReplayPage() { return <div className="space-y-6"><div className="flex items-center gap-2 text-xs text-muted-foreground"><Link to="/recovery-cases" className="hover:text-foreground">Recovery Cases</Link><ChevronRight className="size-3"/><span className="text-foreground">RC-2048</span></div><PageHeader eyebrow="Decision replay · RC-2048" title="₹84,000 · Aarav Mehta" description="A complete, deterministic replay of how this failed payment was diagnosed and governed." action={<Badge status="Pending"/>}/><div className="grid gap-6 xl:grid-cols-[1fr_320px]"><Panel className="p-6"><SectionTitle title="Recovery decision trace" sub="Every step is timestamped and reproducible" action={<Button variant="secondary"><Play className="size-4"/>Replay</Button>}/><div className="mt-7">{steps.map((s,i)=><div key={s[0]} className="grid grid-cols-[32px_minmax(0,1fr)] gap-4"><div className="flex flex-col items-center"><div className={`grid size-8 place-items-center rounded-full border ${s[3]==="policy"?"border-primary/40 bg-primary-soft text-primary":s[3]==="failure"?"border-danger/40 bg-danger-soft text-danger":s[3]==="pending"?"border-warning/40 bg-warning-soft text-warning":"border-ai/30 bg-ai-soft text-ai"}`}>{s[3]==="failure"?<X className="size-3.5"/>:s[3]==="policy"?<ShieldCheck className="size-3.5"/>:s[3]==="action"?<Zap className="size-3.5"/>:s[3]==="pending"?<Clock3 className="size-3.5"/>:<Check className="size-3.5"/>}</div>{i<steps.length-1&&<div className="my-1 min-h-10 w-px flex-1 bg-border"/>}</div><div className="pb-7"><div className="flex items-center justify-between gap-4"><p className="text-sm font-semibold text-foreground">{s[0]}</p><span className="font-mono text-[10px] text-muted-foreground">{s[1]}</span></div><p className="mt-1.5 text-xs leading-5 text-muted-foreground">{s[2]}</p></div></div>)}</div></Panel><div className="space-y-4"><Panel><p className="eyebrow">AI Agent</p><p className="mt-3 text-sm font-semibold">Proposes the best action</p><p className="mt-2 text-xs leading-5 text-muted-foreground">Uses failure context, customer history, and recovery patterns to rank actions.</p></Panel><Panel className="border-primary/30"><p className="eyebrow">Policy Engine</p><p className="mt-3 text-sm font-semibold">Decides what is allowed</p><p className="mt-2 text-xs leading-5 text-muted-foreground">Deterministic rules supersede model confidence. This case requires a human.</p></Panel><Panel><p className="eyebrow">Action Layer</p><p className="mt-3 text-sm font-semibold">Executes permitted actions</p><p className="mt-2 text-xs leading-5 text-muted-foreground">No action runs without a policy decision and an immutable audit entry.</p></Panel><Panel><p className="text-xs text-muted-foreground">Recovery probability</p><p className="mt-2 text-3xl font-semibold text-success">86%</p><div className="mt-3 h-1.5 rounded-full bg-secondary"><div className="h-full w-[86%] rounded-full bg-success"/></div></Panel></div></div></div>; }
+export function CaseReplayPage() {
+  const { caseId } = useParams({ strict: false });
+  const [caseData, setCaseData] = useState<any>(null);
+  const [audit, setAudit] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError(null);
+    setCaseData(null);
+    setAudit(null);
+
+    Promise.all([getRecoveryCases(), getAuditLogs()])
+      .then(([casesData, auditData]) => {
+        if (!active) return;
+        const found = (casesData.cases || []).find(
+          (c: any) => String(c.payment_id) === String(caseId)
+        );
+        if (!found) {
+          setCaseData(null);
+          return;
+        }
+        setCaseData(found);
+        const records: any[] = auditData?.records || [];
+        const match = [...records]
+          .reverse()
+          .find((r: any) => String(r.payment_id) === String(caseId));
+        setAudit(match || null);
+      })
+      .catch((err) => {
+        console.error("Case replay error:", err);
+        if (active) setError("Failed to load the recovery case.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [caseId]);
+
+  const decision = caseData?.final_decision;
+  const policy = caseData?.policy || {};
+  const action = caseData?.action || {};
+  const diagnosis = caseData?.diagnosis || {};
+  const proposal = caseData?.ai_proposal || {};
+  const recovery = caseData?.recovery_value || {};
+
+  const humanApproval =
+    policy.requires_human_approval || decision === "REVIEW";
+  const actionExecuted = action.status === "EXECUTED";
+
+  const actionLines: string[] = [];
+  if (action.action !== undefined)
+    actionLines.push(`Action: ${action.action}`);
+  if (action.policy_decision !== undefined)
+    actionLines.push(`Policy decision: ${action.policy_decision}`);
+  if (action.status !== undefined) actionLines.push(`Status: ${action.status}`);
+  if (action.simulated !== undefined)
+    actionLines.push(`Simulated: ${action.simulated ? "yes" : "no"}`);
+  if (action.message) actionLines.push(`Message: ${action.message}`);
+  if (action.retry_after_hours != null)
+    actionLines.push(`Retry after: ${action.retry_after_hours}h`);
+  if (action.executed_at) actionLines.push(`Executed at: ${action.executed_at}`);
+
+  const actionDetail = humanApproval
+    ? "Awaiting human approval. No action is executed until an approval decision is recorded."
+    : decision === "BLOCK"
+      ? action.message || "Execution skipped: the policy decision was not APPROVE."
+      : actionLines.length > 0
+        ? actionLines.join(" - ")
+        : "No action layer result recorded.";
+
+  const auditStamp = audit?.timestamp || caseData?.audit_id || null;
+
+  const replaySteps = caseData
+    ? [
+        {
+          title: "Payment Failed",
+          time: "",
+          detail: `Payment ${caseData.payment_id} of ₹${Number(caseData.amount_inr).toLocaleString("en-IN")} failed (${caseData.failure_code || "unknown"}) on attempt ${caseData.attempt_number}.`,
+          tone: "failure",
+        },
+        {
+          title: "Diagnosis / Root Cause",
+          time: "",
+          detail: `${diagnosis.root_cause || "Unknown"}: ${diagnosis.diagnosis || ""}`.trim(),
+          tone: "ai",
+        },
+        {
+          title: "AI Proposal",
+          time: "",
+          detail: proposal.proposal || proposal.action || "Recovery action proposed.",
+          tone: "ai",
+        },
+        {
+          title: "Policy Decision",
+          time: "",
+          detail: `${policy.decision || decision} - ${policy.reason || ""}`.trim(),
+          tone: "policy",
+        },
+        {
+          title: "Action Layer Result",
+          time: actionExecuted ? (action.executed_at || "") : "",
+          detail: actionDetail,
+          tone: humanApproval || decision === "BLOCK" ? "pending" : "action",
+        },
+        {
+          title: "Final / Audit Result",
+          time: auditStamp || "",
+          detail: `${decision || "Decision recorded"}${auditStamp ? `. Audit timestamp: ${auditStamp}.` : ""}`,
+          tone: decision === "APPROVE" ? "action" : "pending",
+        },
+      ]
+    : [];
+
+  const probability = Math.round((recovery.recovery_probability || 0) * 100);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <Link to="/recovery-cases" className="hover:text-foreground">
+          Recovery Cases
+        </Link>
+        <ChevronRight className="size-3" />
+        <span className="text-foreground">{caseId || "Case"}</span>
+      </div>
+
+      {error ? (
+        <Panel>
+          <p className="py-12 text-center text-sm text-danger">{error}</p>
+        </Panel>
+      ) : loading ? (
+        <Panel>
+          <div className="py-12 text-center text-sm text-muted-foreground">
+            Loading recovery case...
+          </div>
+        </Panel>
+      ) : !caseData ? (
+        <Panel>
+          <div className="py-12 text-center text-sm text-muted-foreground">
+            No recovery case found for {caseId}.
+          </div>
+        </Panel>
+      ) : (
+        <>
+          <PageHeader
+            eyebrow={`Decision replay · ${caseId}`}
+            title={`₹${Number(caseData.amount_inr).toLocaleString("en-IN")} · ${caseData.payment_id}`}
+            description="A complete, deterministic replay of how this failed payment was diagnosed and governed."
+            action={
+              <Badge
+                status={
+                  decision === "APPROVE"
+                    ? "Recovered"
+                    : decision === "BLOCK"
+                      ? "Blocked"
+                      : "Pending"
+                }
+              >
+                {decision || "NO DATA"}
+              </Badge>
+            }
+          />
+
+          <div className="grid gap-6 xl:grid-cols-[1fr_320px]">
+            <Panel className="p-6">
+              <SectionTitle
+                title="Recovery decision trace"
+                sub="Every step is timestamped and reproducible"
+              />
+
+              <div className="mt-7">
+                {replaySteps.map((s, i) => (
+                  <div key={s.title} className="grid grid-cols-[32px_minmax(0,1fr)] gap-4">
+                    <div className="flex flex-col items-center">
+                      <div
+                        className={`grid size-8 place-items-center rounded-full border ${
+                          s.tone === "policy"
+                            ? "border-primary/40 bg-primary-soft text-primary"
+                            : s.tone === "failure"
+                              ? "border-danger/40 bg-danger-soft text-danger"
+                              : s.tone === "pending"
+                                ? "border-warning/40 bg-warning-soft text-warning"
+                                : "border-ai/30 bg-ai-soft text-ai"
+                        }`}
+                      >
+                        {s.tone === "failure" ? (
+                          <X className="size-3.5" />
+                        ) : s.tone === "policy" ? (
+                          <ShieldCheck className="size-3.5" />
+                        ) : s.tone === "action" ? (
+                          <Zap className="size-3.5" />
+                        ) : s.tone === "pending" ? (
+                          <Clock3 className="size-3.5" />
+                        ) : (
+                          <Check className="size-3.5" />
+                        )}
+                      </div>
+
+                      {i < replaySteps.length - 1 && (
+                        <div className="my-1 min-h-10 w-px flex-1 bg-border" />
+                      )}
+                    </div>
+
+                    <div className="pb-7">
+                      <div className="flex items-center justify-between gap-4">
+                        <p className="text-sm font-semibold text-foreground">
+                          {s.title}
+                        </p>
+                        {s.time && (
+                          <span className="font-mono text-[10px] text-muted-foreground">
+                            {s.time}
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1.5 text-xs leading-5 text-muted-foreground">
+                        {s.detail}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Panel>
+
+            <div className="space-y-4">
+              <Panel>
+                <p className="eyebrow">AI Agent</p>
+                <p className="mt-3 text-sm font-semibold">
+                  Proposes the best action
+                </p>
+                <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                  {proposal.proposal || proposal.action || "No proposal recorded."}
+                </p>
+              </Panel>
+
+              <Panel className="border-primary/30">
+                <p className="eyebrow">Policy Engine</p>
+                <p className="mt-3 text-sm font-semibold">
+                  Decides what is allowed
+                </p>
+                <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                  {policy.reason ||
+                    (decision === "APPROVE"
+                      ? "Action is within policy."
+                      : "Action is outside policy.")}
+                  {humanApproval ? " This case requires a human." : ""}
+                </p>
+              </Panel>
+
+              <Panel>
+                <p className="eyebrow">Action Layer</p>
+                <p className="mt-3 text-sm font-semibold">
+                  {humanApproval
+                    ? "Awaiting human approval"
+                    : actionExecuted
+                      ? "Executed permitted action"
+                      : "Execution skipped"}
+                </p>
+                <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                  {actionDetail}
+                </p>
+              </Panel>
+
+              <Panel>
+                <p className="text-xs text-muted-foreground">
+                  Recovery probability
+                </p>
+                <p className="mt-2 text-3xl font-semibold text-success">
+                  {probability}%
+                </p>
+                <div className="mt-3 h-1.5 rounded-full bg-secondary">
+                  <div
+                    className="h-full rounded-full bg-success"
+                    style={{ width: `${probability}%` }}
+                  />
+                </div>
+              </Panel>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 export function ApprovalsPage() {
   const [pendingCases, setPendingCases] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -380,8 +661,16 @@ export function ApprovalsPage() {
   }, []);
 
   const pending = (pendingCases || []).filter(
-    (c) => c.final_decision === "BLOCK" || c.final_decision === "REVIEW"
+    (c) =>
+      (c.final_decision === "BLOCK" || c.final_decision === "REVIEW") &&
+      !c.human_approval
   );
+
+  const refreshCases = () => {
+    getRecoveryCases()
+      .then((data) => setPendingCases(data.cases || []))
+      .catch((error) => console.error("Approvals reload error:", error));
+  };
 
   const handleDecision = async (paymentId: string, decision: "APPROVE" | "REJECT") => {
     setBusyId(paymentId);
@@ -389,6 +678,7 @@ export function ApprovalsPage() {
     try {
       await submitApproval(paymentId, decision);
       setCompleted((prev) => [...prev, paymentId]);
+      refreshCases();
     } catch (error: any) {
       setErrors((prev) => ({
         ...prev,
@@ -684,7 +974,7 @@ export function AuditReplayPage() {
   }, []);
 
   const actionLines =
-    selected.action &&
+    selected?.action &&
     (selected.action.action !== undefined ||
       selected.action.status !== undefined)
       ? [

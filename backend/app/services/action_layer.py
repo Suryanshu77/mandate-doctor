@@ -49,7 +49,13 @@ def execute_action(
     executed_at = _now()
 
     if action == "RETRY_LATER":
-        retry_after_hours = recovery_info.get("retry_after_hours") or 24
+        # Prefer the AI-proposed retry delay; fall back to the policy's
+        # configured cooling-off period when the proposal is silent.
+        retry_after_hours = (
+            recovery_info.get("retry_after_hours")
+            or recovery_info.get("cooling_off_hours")
+            or 24
+        )
 
         return {
             **base,

@@ -1,0 +1,7 @@
+{
+  "retry_limit": 3,
+  "cooling_off_hours": 12,
+  "human_approval_threshold": 75000,
+  "max_contact_attempts": 2,
+  "kill_switch": false
+}

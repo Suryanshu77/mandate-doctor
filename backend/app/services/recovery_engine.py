@@ -20,6 +20,7 @@ def make_recovery_decision(payment: dict[str, Any]) -> dict[str, Any]:
     policy = evaluate_policy(
         amount_inr=payment.get("amount_inr", 0),
         diagnosis=diagnosis,
+        attempt_number=payment.get("attempt_number", 1),
     )
 
     final_decision = policy["decision"]
@@ -34,7 +35,10 @@ def make_recovery_decision(payment: dict[str, Any]) -> dict[str, Any]:
         payment_id=payment.get("payment_id"),
         proposed_action=proposal.get("action"),
         policy_decision=final_decision,
-        recovery_info=proposal,
+        recovery_info={
+            **proposal,
+            "cooling_off_hours": policy.get("cooling_off_hours"),
+        },
     )
 
     audit = log_decision(

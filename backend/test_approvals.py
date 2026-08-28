@@ -91,3 +91,53 @@ def test_invalid_decision_rejected():
     )
 
     assert response.status_code == 400
+
+
+def test_cases_expose_persisted_human_approval():
+    """After a human decision, /api/cases reflects the persisted approval
+    so the Approval Queue no longer treats the case as pending."""
+    case = _pick_case(lambda c: c["final_decision"] == "BLOCK")
+
+    response = client.post(
+        "/api/approvals",
+        json={"payment_id": case["payment_id"], "decision": "REJECT"},
+    )
+    assert response.status_code == 200
+
+    cases = client.get("/api/cases").json()["cases"]
+    refreshed = next(c for c in cases if c["payment_id"] == case["payment_id"])
+
+    human_approval = refreshed["human_approval"]
+    assert human_approval is not None
+    assert human_approval["event"] == "HUMAN_APPROVAL"
+    assert human_approval["decision"] == "REJECT"
+
+
+def test_latest_human_approval_record_wins():
+    """When duplicate approval records exist, the latest decision is what
+    the pending queue derives from."""
+    case = _pick_case(lambda c: c["final_decision"] == "BLOCK")
+
+    first = client.post(
+        "/api/approvals",
+        json={"payment_id": case["payment_id"], "decision": "APPROVE"},
+    )
+    assert first.status_code == 200
+
+    after_first = client.get("/api/cases").json()["cases"]
+    human_approval = next(
+        c for c in after_first if c["payment_id"] == case["payment_id"]
+    )["human_approval"]
+    assert human_approval["decision"] == "APPROVE"
+
+    second = client.post(
+        "/api/approvals",
+        json={"payment_id": case["payment_id"], "decision": "REJECT"},
+    )
+    assert second.status_code == 200
+
+    after_second = client.get("/api/cases").json()["cases"]
+    human_approval = next(
+        c for c in after_second if c["payment_id"] == case["payment_id"]
+    )["human_approval"]
+    assert human_approval["decision"] == "REJECT"

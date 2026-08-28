@@ -59,6 +59,12 @@ def get_recovery_cases() -> list[dict[str, Any]]:
     return _cached_cases
 
 
+def invalidate_cache() -> None:
+    """Drop cached policy results so the next read reflects current settings."""
+    global _cached_cases
+    _cached_cases = None
+
+
 def get_overview() -> dict[str, Any]:
     """Aggregate overview metrics from the same 300 records used for cases."""
     cases = get_recovery_cases()
