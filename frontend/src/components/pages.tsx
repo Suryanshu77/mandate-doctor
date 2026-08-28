@@ -9,7 +9,10 @@ import {
   getAuditLogs,
   getOverviewMetrics,
   getRecoveryCases,
+  getSettings,
   submitApproval,
+  updateSettings,
+  type Settings,
 } from "../lib/api";
 
 const tipStyle = { background: "var(--popover)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 };
@@ -925,4 +928,129 @@ export function AuditReplayPage() {
     </div>
   );
 }
-export function SettingsPage(){const [kill,setKill]=useState(false); const [settings,setSettings]=useState({retry:3,cooling:12,threshold:75000,contacts:2}); const update=(key:keyof typeof settings,v:number)=>setSettings({...settings,[key]:v}); return <div className="space-y-6"><PageHeader eyebrow="Policy controls" title="Recovery Settings" description="Configure deterministic guardrails that govern every AI-proposed recovery action." action={<Button><Check className="size-4"/>Save changes</Button>}/><Principle/><div className="grid gap-6 xl:grid-cols-[1fr_340px]"><Panel><SectionTitle title="Recovery policy" sub="Version 2.4 · applies to all active mandates"/><div className="mt-6 divide-y divide-border">{[{key:"retry",label:"Retry limit",sub:"Maximum automated attempts per failed payment",suffix:"attempts"},{key:"cooling",label:"Cooling-off period",sub:"Minimum delay between recovery attempts",suffix:"hours"},{key:"threshold",label:"Human approval threshold",sub:"Payments above this value require approval",suffix:"₹"},{key:"contacts",label:"Maximum contact attempts",sub:"Customer messages allowed per recovery cycle",suffix:"messages"}].map(row=><div key={row.key} className="grid grid-cols-[minmax(0,1fr)_150px] items-center gap-5 py-5"><div><label htmlFor={row.key} className="text-sm font-medium text-foreground">{row.label}</label><p className="mt-1 text-xs text-muted-foreground">{row.sub}</p></div><div className="flex items-center rounded-lg border border-border bg-secondary"><input id={row.key} type="number" value={settings[row.key as keyof typeof settings]} onChange={e=>update(row.key as keyof typeof settings,Number(e.target.value))} className="h-10 min-w-0 flex-1 bg-transparent px-3 text-right font-mono text-sm outline-none"/><span className="pr-3 text-[10px] text-muted-foreground">{row.suffix}</span></div></div>)}</div></Panel><div className="space-y-4"><Panel className={kill?"border-danger/50":""}><div className="flex items-start justify-between gap-4"><div><p className="text-sm font-semibold">Recovery kill switch</p><p className="mt-2 text-xs leading-5 text-muted-foreground">Immediately prevent all queued and new recovery actions.</p></div><button onClick={()=>setKill(!kill)} role="switch" aria-checked={kill} className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${kill?"bg-danger":"bg-muted"}`}><span className={`absolute top-1 size-4 rounded-full bg-foreground transition-transform ${kill?"translate-x-6":"translate-x-1"}`}/></button></div>{kill&&<div className="mt-4 rounded-lg border border-danger/30 bg-danger-soft p-3 text-xs text-danger">Recovery execution is paused.</div>}</Panel><Panel><ShieldCheck className="size-5 text-primary"/><p className="mt-4 text-sm font-semibold">Policy-first execution</p><p className="mt-2 text-xs leading-5 text-muted-foreground">AI recommendations cannot bypass limits, approval thresholds, cooldowns, or contact policies.</p></Panel><Panel><p className="eyebrow">Environment</p><div className="mt-3 flex items-center justify-between"><span className="text-sm">Simulation mode</span><Badge status="Test">ACTIVE</Badge></div><p className="mt-3 text-xs leading-5 text-muted-foreground">All values and outcomes in this prototype are mock data.</p></Panel></div></div></div>}
+export function SettingsPage() {
+  const [kill, setKill] = useState(false);
+  const [settings, setSettings] = useState({ retry: 3, cooling: 12, threshold: 75000, contacts: 2 });
+  const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const update = (key: keyof typeof settings, v: number) => setSettings({ ...settings, [key]: v });
+
+  useEffect(() => {
+    let active = true;
+    getSettings().then((loaded) => {
+      if (!active) return;
+      setSettings({
+        retry: loaded.retry_limit,
+        cooling: loaded.cooling_off_hours,
+        threshold: loaded.human_approval_threshold,
+        contacts: loaded.max_contact_attempts,
+      });
+      setKill(loaded.kill_switch);
+    }).catch(() => {
+      if (active) setStatus("error");
+    });
+    return () => { active = false; };
+  }, []);
+
+  const handleSave = async () => {
+    setStatus("saving");
+    try {
+      await updateSettings({
+        retry_limit: settings.retry,
+        cooling_off_hours: settings.cooling,
+        human_approval_threshold: settings.threshold,
+        max_contact_attempts: settings.contacts,
+        kill_switch: kill,
+      });
+      setStatus("saved");
+    } catch {
+      setStatus("error");
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Policy controls"
+        title="Recovery Settings"
+        description="Configure deterministic guardrails that govern every AI-proposed recovery action."
+        action={
+          <div className="flex items-center gap-3">
+            {status === "saved" && <span className="text-xs text-emerald-500">Saved</span>}
+            {status === "error" && <span className="text-xs text-danger">Failed to save</span>}
+            <Button onClick={handleSave} disabled={status === "saving"}>
+              <Check className="size-4" />
+              {status === "saving" ? "Saving…" : "Save changes"}
+            </Button>
+          </div>
+        }
+      />
+      <Principle />
+      <div className="grid gap-6 xl:grid-cols-[1fr_340px]">
+        <Panel>
+          <SectionTitle title="Recovery policy" sub="Version 2.4 · applies to all active mandates" />
+          <div className="mt-6 divide-y divide-border">
+            {[
+              { key: "retry", label: "Retry limit", sub: "Maximum automated attempts per failed payment", suffix: "attempts" },
+              { key: "cooling", label: "Cooling-off period", sub: "Minimum delay between recovery attempts", suffix: "hours" },
+              { key: "threshold", label: "Human approval threshold", sub: "Payments above this value require approval", suffix: "₹" },
+              { key: "contacts", label: "Maximum contact attempts", sub: "Customer messages allowed per recovery cycle", suffix: "messages" },
+            ].map((row) => (
+              <div key={row.key} className="grid grid-cols-[minmax(0,1fr)_150px] items-center gap-5 py-5">
+                <div>
+                  <label htmlFor={row.key} className="text-sm font-medium text-foreground">{row.label}</label>
+                  <p className="mt-1 text-xs text-muted-foreground">{row.sub}</p>
+                </div>
+                <div className="flex items-center rounded-lg border border-border bg-secondary">
+                  <input
+                    id={row.key}
+                    type="number"
+                    value={settings[row.key as keyof typeof settings]}
+                    onChange={(e) => update(row.key as keyof typeof settings, Number(e.target.value))}
+                    className="h-10 min-w-0 flex-1 bg-transparent px-3 text-right font-mono text-sm outline-none"
+                  />
+                  <span className="pr-3 text-[10px] text-muted-foreground">{row.suffix}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Panel>
+        <div className="space-y-4">
+          <Panel className={kill ? "border-danger/50" : ""}>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold">Recovery kill switch</p>
+                <p className="mt-2 text-xs leading-5 text-muted-foreground">Immediately prevent all queued and new recovery actions.</p>
+              </div>
+              <button
+                onClick={() => setKill(!kill)}
+                role="switch"
+                aria-checked={kill}
+                className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${kill ? "bg-danger" : "bg-muted"}`}
+              >
+                <span className={`absolute top-1 size-4 rounded-full bg-foreground transition-transform ${kill ? "translate-x-6" : "translate-x-1"}`} />
+              </button>
+            </div>
+            {kill && (
+              <div className="mt-4 rounded-lg border border-danger/30 bg-danger-soft p-3 text-xs text-danger">
+                Recovery execution is paused.
+              </div>
+            )}
+          </Panel>
+          <Panel>
+            <ShieldCheck className="size-5 text-primary" />
+            <p className="mt-4 text-sm font-semibold">Policy-first execution</p>
+            <p className="mt-2 text-xs leading-5 text-muted-foreground">AI recommendations cannot bypass limits, approval thresholds, cooldowns, or contact policies.</p>
+          </Panel>
+          <Panel>
+            <p className="eyebrow">Environment</p>
+            <div className="mt-3 flex items-center justify-between">
+              <span className="text-sm">Simulation mode</span>
+              <Badge status="Test">ACTIVE</Badge>
+            </div>
+            <p className="mt-3 text-xs leading-5 text-muted-foreground">All values and outcomes in this prototype are mock data.</p>
+          </Panel>
+        </div>
+      </div>
+    </div>
+  );
+}
