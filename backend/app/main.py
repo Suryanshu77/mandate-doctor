@@ -9,6 +9,7 @@ from app.api.diagnosis import router as diagnosis_router
 from app.api.cases import router as cases_router
 from app.api.audit import router as audit_router
 from app.api.metrics import router as metrics_router
+from app.api.evaluation import router as evaluation_router
 from app.api.settings import router as settings_router
 from app.services.action_layer import execute_action
 from app.services.audit import log_approval
@@ -57,6 +58,7 @@ app.include_router(diagnosis_router)
 app.include_router(cases_router)
 app.include_router(audit_router)
 app.include_router(metrics_router)
+app.include_router(evaluation_router)
 app.include_router(settings_router)
 
 

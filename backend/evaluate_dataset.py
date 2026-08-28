@@ -1,92 +1,153 @@
-from collections import Counter
+"""Run the Mandate Doctor evaluation harness over the full synthetic dataset.
 
-from app.services.dataset import load_failed_mandates
-from app.services.recovery_engine import make_recovery_decision
+Usage:
+    python evaluate_dataset.py
 
+This script is side-effect free: nothing is written to the audit log and no
+settings are modified. All recovery figures are EXPECTED / SIMULATED recovery
+computed with the project's deterministic recovery model (the synthetic
+dataset contains no realised future payment outcomes).
+"""
 
-records = load_failed_mandates()
+import sys
 
-results = []
-
-y_true = []
-y_pred = []
-
-total_at_risk = 0
-total_expected_recovery = 0
-
-for record in records:
-    payment = {
-        "payment_id": record.get("payment_id"),
-        "amount_inr": float(record.get("amount_inr", 0)),
-        "failure_code": record.get("failure_code"),
-        "mandate_status": record.get("mandate_status", "active"),
-        "attempt_number": int(record.get("attempt_number", 1)),
-        "previous_successes": int(record.get("previous_successes", 0)),
-        "previous_failures": int(record.get("previous_failures", 0)),
-    }
-
-    result = make_recovery_decision(payment)
-
-    results.append(result)
-
-    y_true.append(record.get("root_cause"))
-    y_pred.append(result["diagnosis"]["root_cause"])
-
-    total_at_risk += result["recovery_value"]["amount_at_risk"]
-    total_expected_recovery += result["recovery_value"]["expected_recovery"]
+from app.services.evaluation import evaluate
 
 
-# Diagnosis accuracy
-correct = sum(
-    actual == predicted
-    for actual, predicted in zip(y_true, y_pred)
-)
+def main() -> None:
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except (AttributeError, ValueError):
+        pass
 
-accuracy = correct / len(y_true) if y_true else 0
+    result = evaluate()
+
+    settings = result["settings"]
+    doctor = result["mandate_doctor"]
+    naive = result["naive_baseline"]
+    unrestricted = result["unrestricted_naive"]
+    dataset = result["dataset"]
+    methodology = result["methodology"]
+
+    print("========== MANDATE DOCTOR DATASET EVALUATION ==========")
+    print(f"Dataset: {dataset['name']}  |  Records: {dataset['total_records']}")
+    print(f"Revenue at risk: {_money(dataset['revenue_at_risk'])}")
+    print(f"Settings: retry_limit={settings['retry_limit']}, "
+          f"cooling_off_hours={settings['cooling_off_hours']}, "
+          f"human_approval_threshold={settings['human_approval_threshold']}, "
+          f"max_contact_attempts={settings['max_contact_attempts']}, "
+          f"kill_switch={settings['kill_switch']}")
+    print(f"Mode: {result['labelled_as']}")
+    print()
+
+    print("========== DIAGNOSIS ==========")
+    print(f"Diagnosis accuracy: {result['diagnosis_accuracy']:.2f}%")
+    for root_cause, count in result["diagnosis_counts"].items():
+        print(f"  {root_cause}: {count}")
+    print()
+
+    print("========== POLICY DECISIONS ==========")
+    for decision, count in result["policy_decisions"].items():
+        print(f"  {decision}: {count}")
+    print()
+
+    print("========== ACTION LAYER (simulated) ==========")
+    for status, count in doctor["action_distribution"].items():
+        print(f"  {status}: {count}")
+    print()
+
+    print("========== REVENUE BREAKDOWN ==========")
+    breakdown = result["revenue_breakdown"]
+    print(f"Revenue at risk:               {_money(breakdown['revenue_at_risk'])}")
+    print(f"  Safe recoverable revenue:    {_money(breakdown['safe_recoverable_revenue'])}")
+    print(f"  Uncollectable revenue:       {_money(breakdown['uncollectable_revenue'])}")
+    print()
+
+    print("========== COMPARISON A: RAW (unrestricted naive, transparent) ==========")
+    print(f"Mandate Doctor expected recovery: {_money(doctor['expected_recovery'])} "
+          f"({doctor['expected_recovery_rate']:.2f}%)")
+    print(f"Unrestricted naive expected:       {_money(unrestricted['expected_recovery'])} "
+          f"({unrestricted['expected_recovery_rate']:.2f}%)")
+    raw = result["comparison_raw"]
+    print(f"Absolute improvement: {_money(raw['absolute_recovery_improvement'])} "
+          f"| rate {raw['recovery_rate_improvement_points']:.2f} pp "
+          f"| uplift {raw['uplift_percentage_relative_to_naive']:.2f}%")
+    print(f"Caveat: {raw['caveat']}")
+    print()
+
+    print("========== COMPARISON B: DEFENSIBLE (naive retry on valid mandates only) ==========")
+    print(f"Mandate Doctor expected recovery: {_money(doctor['expected_recovery'])} "
+          f"({doctor['expected_recovery_rate']:.2f}%)")
+    print(f"Naive baseline expected recovery: {_money(naive['expected_recovery'])} "
+          f"({naive['expected_recovery_rate']:.2f}%)")
+    comp = result["comparison"]
+    print(f"Absolute improvement: {_money(comp['absolute_recovery_improvement'])} "
+          f"| rate {comp['recovery_rate_improvement_points']:.2f} pp "
+          f"| uplift {comp['uplift_percentage_relative_to_naive']:.2f}%")
+    print(f"Naive baseline definition: {methodology['naive_baseline_definition']}")
+    print()
+
+    print("========== SAFE / RECOVERABLE SUBSET ==========")
+    safe = result["safe_recoverable"]
+    print(f"Legitimate opportunities: {safe['count']}  "
+          f"(exposure {_money(safe['amount_at_risk'])})")
+    print(f"  Mandate Doctor expected: {_money(safe['mandate_doctor_expected'])} "
+          f"({safe['mandate_doctor_recovery_rate']:.2f}% of safe exposure)")
+    print(f"  Naive (same subset):     {_money(safe['naive_expected'])} "
+          f"({safe['naive_recovery_rate']:.2f}% of safe exposure)")
+    print(f"  Recovery difference: {_money(safe['recovery_difference'])} "
+          f"| {safe['recovery_rate_improvement_points']:.2f} pp")
+    print()
+
+    print("========== ATTAINABLE EXPECTED RECOVERY ==========")
+    print(f"Model-attainable expected recovery (any policy-compliant strategy): "
+          f"{_money(result['attainable_expected_recovery'])}")
+    print(f"Mandate Doctor share of attainable: "
+          f"{result['md_share_of_attainable_percent']:.2f}%")
+    print()
+
+    print("========== UNCOLLECTABLE CASES (policy BLOCK, not hazarded) ==========")
+    print(f"Count: {result['uncollectable_cases']['count']}  "
+          f"Amount: {_money(result['uncollectable_cases']['amount_at_risk'])}")
+    for payment in result["uncollectable_cases"]["payments"]:
+        print(f"  {payment['payment_id']}  {_money(payment['amount_inr']):>12}  "
+              f"{payment['root_cause']:<18} {payment['reason']}")
+    print()
+
+    print("========== SAFETY: UNSAFE RETRIES & POLICY VIOLATIONS ==========")
+    unsafe = result["unsafe_retries_avoided"]
+    print(f"Unsafe/invalid retries avoided by MD: {unsafe['count']}  "
+          f"({_money(unsafe['amount_at_risk'])} never hazarded)")
+    print(f"Policy violations (Mandate Doctor): {result['policy_violations']['count']}")
+    print(f"Policy violations the naive would commit: "
+          f"{result['naive_policy_violations']['count']}")
+    for detail in result["policy_violations"]["details"]:
+        print(f"  {detail}")
+    print()
+
+    print("========== BY DIAGNOSIS (doctor vs mechanical naive, expected) ==========")
+    print(f"  {'root cause':<16} {'count':>6} {'at risk':>12} "
+          f"{'doctor':>14} {'naive':>14}")
+    for root_cause, bucket in sorted(
+        result["by_diagnosis"].items(),
+        key=lambda item: item[1]["amount_at_risk"],
+        reverse=True,
+    ):
+        print(f"  {root_cause:<16} {bucket['count']:>6} "
+              f"{_money(bucket['amount_at_risk']):>12} "
+              f"{_money(bucket['doctor_expected']):>14} "
+              f"{_money(bucket['naive_expected']):>14}")
+    print()
+
+    print("========== REPRODUCIBILITY ==========")
+    print(f"Result digest (sha256, stable across runs): {result['reproducibility_digest']}")
+    print("Re-running with the same dataset and settings produces identical "
+          "metrics (no audit records written).")
 
 
-# Counts
-diagnoses = Counter(y_pred)
-actions = Counter(
-    r["ai_proposal"]["action"] for r in results
-)
-decisions = Counter(
-    r["final_decision"] for r in results
-)
+def _money(value: float) -> str:
+    return f"₹{value:,.2f}"
 
 
-recovery_rate = (
-    total_expected_recovery / total_at_risk
-    if total_at_risk
-    else 0
-)
-
-
-print("\n========== DATASET EVALUATION ==========")
-print(f"Total records: {len(results)}")
-
-print("\n========== DIAGNOSIS ==========")
-print(f"Correct: {correct}")
-print(f"Incorrect: {len(results) - correct}")
-print(f"Accuracy: {accuracy:.2%}")
-
-print("\n========== DIAGNOSIS COUNTS ==========")
-for diagnosis, count in diagnoses.items():
-    print(f"{diagnosis}: {count}")
-
-print("\n========== AI PROPOSALS ==========")
-for action, count in actions.items():
-    print(f"{action}: {count}")
-
-print("\n========== POLICY DECISIONS ==========")
-for decision, count in decisions.items():
-    print(f"{decision}: {count}")
-
-print("\n========== REVENUE METRICS ==========")
-print(f"Total revenue at risk: ₹{total_at_risk:,.2f}")
-print(f"Expected recovery: ₹{total_expected_recovery:,.2f}")
-print(f"Expected recovery rate: {recovery_rate:.2%}")
-print(
-    f"Expected unrecovered amount: "
-    f"₹{total_at_risk - total_expected_recovery:,.2f}"
-)
+if __name__ == "__main__":
+    main()

@@ -8,7 +8,16 @@ from app.services.policy_engine import evaluate_policy
 from app.services.recovery_value import calculate_recovery_value
 
 
-def make_recovery_decision(payment: dict[str, Any]) -> dict[str, Any]:
+def make_recovery_decision(
+    payment: dict[str, Any],
+    audit: bool = True,
+) -> dict[str, Any]:
+    """Compute the full recovery decision for a payment.
+
+    ``audit`` controls whether the decision is persisted to the audit log.
+    The evaluation harness calls this with ``audit=False`` so it never
+    appends duplicate records to ``audit_logs.json``.
+    """
 
     diagnosis = diagnose_payment(payment)
 
@@ -41,14 +50,18 @@ def make_recovery_decision(payment: dict[str, Any]) -> dict[str, Any]:
         },
     )
 
-    audit = log_decision(
-        payment_id=payment.get("payment_id"),
-        diagnosis=diagnosis,
-        ai_proposal=proposal,
-        policy=policy,
-        final_decision=final_decision,
-        action=action,
-    )
+    audit_id = None
+
+    if audit:
+        audit_record = log_decision(
+            payment_id=payment.get("payment_id"),
+            diagnosis=diagnosis,
+            ai_proposal=proposal,
+            policy=policy,
+            final_decision=final_decision,
+            action=action,
+        )
+        audit_id = audit_record["timestamp"]
 
     return {
         "payment_id": payment.get("payment_id"),
@@ -59,5 +72,5 @@ def make_recovery_decision(payment: dict[str, Any]) -> dict[str, Any]:
         "recovery_value": recovery_value,
         "final_decision": final_decision,
         "action": action,
-        "audit_id": audit["timestamp"],
+        "audit_id": audit_id,
     }
