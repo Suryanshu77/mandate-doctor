@@ -20,6 +20,7 @@ backend/.env
 
 # ---------- Runtime-generated JSON persistence state ----------
 backend/data/audit_logs.json
+backend/data/settings.json
 backend/data/webhook_events.json
 backend/data/*.lock
 
