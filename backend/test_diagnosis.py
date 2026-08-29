@@ -50,12 +50,13 @@ test_cases = [
 ]
 
 
-for payment in test_cases:
-    result = diagnose_payment(payment)
+if __name__ == "__main__":
+    for payment in test_cases:
+        result = diagnose_payment(payment)
 
-    print("\nPayment:", payment["payment_id"])
-    print("Failure:", payment["failure_code"])
-    print("Diagnosis:", result["root_cause"])
-    print("Confidence:", result["confidence"])
-    print("Recoverable:", result["recoverable"])
-    print("Action:", result["recommended_action"])
+        print("\nPayment:", payment["payment_id"])
+        print("Failure:", payment["failure_code"])
+        print("Diagnosis:", result["root_cause"])
+        print("Confidence:", result["confidence"])
+        print("Recoverable:", result["recoverable"])
+        print("Action:", result["recommended_action"])
