@@ -5,8 +5,8 @@
 # SSR-rendered app with zero changes to the frontend source.
 #
 # Package manager: bun (the project's canonical manager — bun.lock is the
-# authoritative lockfile; the committed npm package-lock.json is stale and
-# `npm ci` does not resolve, so we use `bun install --frozen-lockfile`).
+# authoritative lockfile and no package-lock.json is committed, so we use
+# `bun install --frozen-lockfile`).
 FROM node:24-slim AS base
 
 ENV CI=true \

@@ -1,8 +1,8 @@
 import { Link, useParams } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Area, AreaChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { CartesianGrid, Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Activity, ArrowRight, BrainCircuit, Check, CheckCircle2, ChevronRight, CircleDollarSign, Clock3, Download, Filter, Gauge, History, Pause, Play, RotateCcw, Search, ShieldCheck, SlidersHorizontal, Sparkles, TrendingUp, UserCheck, X, Zap } from "lucide-react";
-import { rootCauses, trendData, type RecoveryCase } from "../lib/mock-data";
+import type { RecoveryCase } from "../lib/mock-data";
 import { Badge, Button, Metric, PageHeader, Panel } from "./ui";
 import {
   getAnalytics,
@@ -16,7 +16,6 @@ import {
 } from "../lib/api";
 
 const tipStyle = { background: "var(--popover)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 };
-const funnel = [{ label: "Failed", value: "2,847", width: "100%" }, { label: "Diagnosed", value: "2,731", width: "85%" }, { label: "Action taken", value: "1,924", width: "68%" }, { label: "Recovered", value: "1,316", width: "49%" }];
 
 function Principle() { return <div className="flex items-center gap-3 rounded-lg border border-ai/20 bg-ai-soft px-4 py-3"><BrainCircuit className="size-4 shrink-0 text-ai"/><p className="text-xs text-muted-foreground"><strong className="text-foreground">The AI proposes.</strong> The Policy Engine decides.</p></div>; }
 function SectionTitle({ title, sub, action }: { title: string; sub: string; action?: React.ReactNode }) { return <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4"><div className="min-w-0"><h2 className="text-base font-semibold text-foreground">{title}</h2><p className="mt-1 text-xs text-muted-foreground">{sub}</p></div>{action}</div>; }
@@ -64,7 +63,7 @@ export function OverviewPage() {
     <div className="space-y-6">
       <PageHeader
         eyebrow="Live recovery posture · Demo data"
-        title="Good morning, Rohan."
+        title="Good morning."
         description="Your recovery engine is operating within policy."
         action={
           <Button variant="secondary">
@@ -151,127 +150,6 @@ export function OverviewPage() {
   value={metrics ? String(metrics.policy_decisions.APPROVE) : "—"}
   change={metrics ? `${metrics.policy_decisions.BLOCK} blocked` : "—"}
 />
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-[0.85fr_1.4fr]">
-        <Panel>
-          <SectionTitle
-            title="Recovery funnel"
-            sub="Current synthetic dataset"
-          />
-
-          <div className="mt-7 space-y-3">
-            {funnel.map((item, i) => (
-              <div key={item.label} className="flex items-center gap-3">
-                <span className="w-5 font-mono text-[10px] text-muted-foreground">
-                  0{i + 1}
-                </span>
-
-                <div
-                  className="relative h-12 overflow-hidden rounded-md border border-border bg-secondary"
-                  style={{ width: item.width }}
-                >
-                  <div className="absolute inset-y-0 left-0 w-full bg-gradient-to-r from-primary/20 to-ai/10" />
-
-                  <div className="relative flex h-full items-center justify-between px-4">
-                    <span className="text-xs font-medium text-foreground">
-                      {item.label}
-                    </span>
-                    <span className="font-mono text-xs text-foreground">
-                      {item.value}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-6 flex items-center justify-between border-t border-border pt-4 text-xs">
-            <span className="text-muted-foreground">Expected recovery rate</span>
-            <span className="font-semibold text-success">
-              {metrics ? `${metrics.expected_recovery_rate}%` : "—"}
-            </span>
-          </div>
-        </Panel>
-
-        <Panel>
-          <SectionTitle
-            title="Recovery performance"
-            sub="Mandate Doctor compared with baseline retry"
-            action={<Badge status="AI">OPTIMIZED</Badge>}
-          />
-
-          <div className="mt-5 h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={trendData}>
-                <defs>
-                  <linearGradient id="doctor" x1="0" y1="0" x2="0" y2="1">
-                    <stop
-                      offset="0%"
-                      stopColor="var(--primary)"
-                      stopOpacity={0.28}
-                    />
-                    <stop
-                      offset="100%"
-                      stopColor="var(--primary)"
-                      stopOpacity={0}
-                    />
-                  </linearGradient>
-                </defs>
-
-                <CartesianGrid
-                  stroke="var(--border)"
-                  vertical={false}
-                />
-
-                <XAxis
-                  dataKey="day"
-                  stroke="var(--muted-foreground)"
-                  tickLine={false}
-                  axisLine={false}
-                  fontSize={10}
-                />
-
-                <YAxis
-                  stroke="var(--muted-foreground)"
-                  tickLine={false}
-                  axisLine={false}
-                  fontSize={10}
-                />
-
-                <Tooltip contentStyle={tipStyle} />
-
-                <Area
-                  type="monotone"
-                  dataKey="doctor"
-                  stroke="var(--primary)"
-                  fill="url(#doctor)"
-                  strokeWidth={2}
-                />
-
-                <Line
-                  type="monotone"
-                  dataKey="naive"
-                  stroke="var(--muted-foreground)"
-                  strokeDasharray="5 5"
-                  dot={false}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-
-          <div className="flex gap-5 text-xs text-muted-foreground">
-            <span className="flex items-center gap-2">
-              <i className="size-2 rounded-full bg-primary" />
-              Mandate Doctor
-            </span>
-
-            <span className="flex items-center gap-2">
-              <i className="size-2 rounded-full bg-muted-foreground" />
-              Naive retry
-            </span>
-          </div>
-        </Panel>
       </div>
 
       <Panel>

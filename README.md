@@ -205,7 +205,7 @@ pip install -r requirements.txt
 uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
-Frontend (bun — the canonical package manager; the committed `package-lock.json` is stale and `npm ci` does not resolve, so use bun):
+Frontend (bun — the canonical package manager; `bun.lock` is authoritative and no `package-lock.json` is committed, so use bun):
 
 ```bash
 cd frontend
@@ -334,3 +334,4 @@ Prints the full evaluation report (diagnosis, decisions, revenue breakdown, both
 - **No database.** State persists as JSON files under `backend/data/`; the audit log grows append-only (one ~300-row batch per cold-cache full run).
 - **Frontend is served by `vite dev`**, not a production build, matching the project's existing workflow.
 - **Webhook ingestion is inert** until `RAZORPAY_WEBHOOK_SECRET` is configured.
+- **API endpoints are unauthenticated** in this simulation/demo and are intended for local/demo use.
