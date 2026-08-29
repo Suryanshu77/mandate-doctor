@@ -10,13 +10,32 @@ AUDIT_FILE = (
     / "audit_logs.json"
 )
 
+_audit_file = AUDIT_FILE
+
+
+def configure_audit_file(path) -> None:
+    """Point the audit store at an alternate file.
+
+    Used by tests/isolated runs so webhook fixtures never pollute the
+    real production ``audit_logs.json``. Passing the original back in
+    restores default behavior.
+    """
+    global _audit_file
+    _audit_file = Path(path)
+
+
+def _current_audit_file() -> Path:
+    return _audit_file
+
 
 def _load_records() -> list[dict[str, Any]]:
-    if not AUDIT_FILE.exists():
+    target = _current_audit_file()
+
+    if not target.exists():
         return []
 
     try:
-        with open(AUDIT_FILE, "r", encoding="utf-8") as file:
+        with open(target, "r", encoding="utf-8") as file:
             records = json.load(file)
     except (json.JSONDecodeError, OSError, ValueError):
         return []
@@ -51,8 +70,9 @@ def log_decision(
     records = _load_records()
     records.append(record)
 
-    AUDIT_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with open(AUDIT_FILE, "w", encoding="utf-8") as file:
+    target = _current_audit_file()
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with open(target, "w", encoding="utf-8") as file:
         json.dump(records, file, indent=2)
 
     return record
@@ -88,8 +108,9 @@ def log_approval(
     records = _load_records()
     records.append(record)
 
-    AUDIT_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with open(AUDIT_FILE, "w", encoding="utf-8") as file:
+    target = _current_audit_file()
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with open(target, "w", encoding="utf-8") as file:
         json.dump(records, file, indent=2)
 
     return record

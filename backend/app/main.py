@@ -11,6 +11,7 @@ from app.api.audit import router as audit_router
 from app.api.metrics import router as metrics_router
 from app.api.evaluation import router as evaluation_router
 from app.api.settings import router as settings_router
+from app.api.webhooks import router as webhooks_router
 from app.services.action_layer import execute_action
 from app.services.audit import log_approval
 from app.services.recovery_pipeline import get_overview, get_recovery_cases
@@ -60,6 +61,7 @@ app.include_router(audit_router)
 app.include_router(metrics_router)
 app.include_router(evaluation_router)
 app.include_router(settings_router)
+app.include_router(webhooks_router)
 
 
 class ApprovalRequest(BaseModel):
