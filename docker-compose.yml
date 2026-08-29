@@ -1,0 +1,53 @@
+name: mandate-doctor
+
+# Mandate Doctor — one-command local stack.
+#
+#   docker compose up --build
+#
+# Then open http://localhost:8080 in the host browser. The frontend talks to
+# the backend directly from the browser at http://127.0.0.1:8000 (see
+# frontend/src/lib/api.ts), so the backend port must be published on the host.
+#
+# Architecture (no database; the prototype persists JSON state on disk):
+#   Browser -> frontend (vite dev, :8080)  and  Browser -> backend API (:8000)
+#
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: mandate-doctor-backend
+    restart: unless-stopped
+    environment:
+      # TEST-mode Razorpay webhook verification secret. Read from the
+      # repository .env (see .env.example). Empty is a safe default: webhook
+      # ingestion returns 500 "server_not_configured" until a secret is set,
+      # and no real credentials are ever baked into the image.
+      RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-}
+    ports:
+      - "8000:8000"
+    volumes:
+      # Persist runtime JSON state (settings.json, audit_logs.json,
+      # webhook_events.json) across restarts without losing data or erasing
+      # the seed dataset.
+      - mandate_backend_data:/app/backend/data
+    healthcheck:
+      test: [ "CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)" ]
+      interval: 10s
+      timeout: 5s
+      start_period: 25s
+      retries: 5
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: mandate-doctor-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+
+volumes:
+  mandate_backend_data:

@@ -1,0 +1,31 @@
+# ---------- Frontend dependencies & build output ----------
+frontend/node_modules/
+frontend/.output/
+frontend/.tanstack/
+frontend/.wrangler/
+frontend/dist/
+frontend/package-lock.json
+
+# ---------- Python ----------
+backend/venv/
+**/__pycache__/
+*.py[cod]
+**/.pytest_cache/
+
+# ---------- Environment / secrets (never commit real values) ----------
+.env
+.env.*
+!.env.example
+backend/.env
+
+# ---------- Runtime-generated JSON persistence state ----------
+backend/data/audit_logs.json
+backend/data/webhook_events.json
+backend/data/*.lock
+
+# ---------- Local webhook test harness ----------
+backend/webhook_live_server.*.log
+backend/webhook_live_server.pid
+
+# ---------- Logs ----------
+*.log

@@ -1,0 +1,44 @@
+# Version control
+.git
+.gitignore
+.dockerignore
+
+# Local/IDE
+.vscode
+.idea
+*.swp
+
+# Backend virtualenv + caches
+backend/venv
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+
+# Environment / secrets (never ship real secrets into an image)
+.env
+.env.*
+!.env.example
+backend/.env
+
+# Local webhook harness logs/pid
+backend/webhook_live_server.*.log
+backend/webhook_live_server.pid
+backend/send_test_webhook.py
+backend/test_*.py
+
+# Frontend dependencies + build output (installed/built fresh in the image)
+frontend/node_modules
+frontend/.output
+frontend/.tanstack
+frontend/.wrangler
+frontend/package-lock.json
+
+# Runtime persistent data is provided via a named volume; do not bake the
+# generated audit log / webhook events store into the image layers.
+backend/data/audit_logs.json
+backend/data/webhook_events.json
+backend/data/*.lock
+
+# Docs / misc
+docs
+README.md

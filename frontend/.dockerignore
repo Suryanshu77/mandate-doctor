@@ -1,0 +1,23 @@
+# Version control
+.git
+.gitignore
+.dockerignore
+
+# Local/IDE
+.vscode
+.idea
+*.swp
+
+# Installed dependencies + build/tooling output (regenerated in the image)
+node_modules
+.output
+.tanstack
+.wrangler
+dist
+
+# Stale npm lockfile (bun.lock is authoritative; this one does not resolve
+# cleanly and is not copied into the build).
+package-lock.json
+
+# Logs
+*.log
