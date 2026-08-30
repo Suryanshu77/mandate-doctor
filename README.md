@@ -32,15 +32,15 @@ The system exists to answer, per failed payment:
 Payment failure event (synthetic dataset or Razorpay TEST webhook)
         │
         ▼
-┌───────────────┐   ┌─────────────────┐   ┌─────────────────────┐
+┌───────────────┐   ┌─────────────────┐    ┌─────────────────────┐
 │  DIAGNOSIS    │──▶│  AI PROPOSAL    │──▶│  POLICY ENGINE      │
-│ (failure code │   │ (recovery agent │   │ (retries, cooling   │
+│ (failure code │   │ (recovery agent │   │ (retries, cooling    │
 │  → root cause)│   │  proposes plan) │   │  off, human-approval │
 └───────────────┘   └─────────────────┘   │  threshold, kill     │
                                           │  switch; decides     │
-      ┌───────────────────────────────────┴───────┐             │
+      ┌───────────────────────────────────┴───────┐              │
       │      final decision: APPROVE / REVIEW / BLOCK            │
-      └───────────────────────────────────┬───────┘             │
+      └───────────────────────────────────┬───────┘              │
                                           ▼                      │
                               ┌─────────────────────┐            │
                               │  RECOVERY VALUE     │            │
