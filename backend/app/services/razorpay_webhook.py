@@ -63,7 +63,7 @@ from dotenv import load_dotenv
 from razorpay.errors import SignatureVerificationError
 from razorpay.utility import Utility
 
-_ENV_FILE = Path(__file__).resolve().parents[1] / ".env"
+_ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
 load_dotenv(_ENV_FILE)
 
 SUPPORTED_EVENTS = {

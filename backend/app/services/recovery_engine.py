@@ -3,6 +3,7 @@ from typing import Any
 from app.services.action_layer import execute_action
 from app.services.audit import log_decision
 from app.services.diagnosis import diagnose_payment
+from app.services.llm_provider import is_enabled
 from app.services.recovery_agent import generate_proposal
 from app.services.policy_engine import evaluate_policy
 from app.services.recovery_value import calculate_recovery_value
@@ -11,19 +12,32 @@ from app.services.recovery_value import calculate_recovery_value
 def make_recovery_decision(
     payment: dict[str, Any],
     audit: bool = True,
+    use_llm: bool | None = None,
 ) -> dict[str, Any]:
     """Compute the full recovery decision for a payment.
 
     ``audit`` controls whether the decision is persisted to the audit log.
     The evaluation harness calls this with ``audit=False`` so it never
     appends duplicate records to ``audit_logs.json``.
+
+    ``use_llm`` controls whether the proposal layer consults the real LLM.
+    When ``None`` it resolves from server-side configuration (enabled only
+    when ``LLM_API_KEY`` is set). Bulk/reproducible paths (evaluation,
+    the cached case pipeline) pass ``use_llm=False`` so they stay fast,
+    deterministic and API-key-independent. The LLM can only ever propose:
+    the policy engine decides and the action layer executes only when the
+    policy says APPROVE.
     """
+
+    if use_llm is None:
+        use_llm = is_enabled()
 
     diagnosis = diagnose_payment(payment)
 
     proposal = generate_proposal(
         payment=payment,
         diagnosis=diagnosis,
+        use_llm=use_llm,
     )
 
     policy = evaluate_policy(

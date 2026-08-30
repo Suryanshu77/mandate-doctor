@@ -28,7 +28,12 @@ def _compute_cases() -> list[dict[str, Any]]:
     for record in records:
         payment = _build_payment(record)
 
-        result = make_recovery_decision(payment)
+        # The bulk/cached pipeline uses the deterministic proposal path (no
+        # LLM call per record): fast, reproducible and API-key independent.
+        # Live per-payment decisions (e.g. POST /api/recovery/decision or a
+        # webhook ingestion) consult the real LLM separately with
+        # ``use_llm`` left to its default.
+        result = make_recovery_decision(payment, use_llm=False)
 
         cases.append({
             "payment_id": payment["payment_id"],

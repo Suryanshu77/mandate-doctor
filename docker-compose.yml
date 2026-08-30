@@ -24,6 +24,14 @@ services:
       # ingestion returns 500 "server_not_configured" until a secret is set,
       # and no real credentials are ever baked into the image.
       RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-}
+      # LLM-assisted proposal layer. Server-side only; the LLM only proposes.
+      # Empty LLM_API_KEY disables the LLM path and the proposal layer runs
+      # deterministically, so the stack works with no LLM configured.
+      AI_PROPOSAL_ENABLED: ${AI_PROPOSAL_ENABLED:-true}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.openai.com/v1}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-10}
     ports:
       - "8000:8000"
     volumes:

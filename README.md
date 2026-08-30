@@ -64,6 +64,7 @@ Payment failure event (synthetic dataset or Razorpay TEST webhook)
 ### Design principles
 
 - **AI proposes, policy decides.** The recovery agent suggests an action and a confidence; the policy engine independently evaluates eligibility and produces the final `APPROVE` / `REVIEW` / `BLOCK` decision. A proposal is never executed because an AI liked it.
+- **LLM assists the proposal, never the decision or the execution.** When `LLM_API_KEY` is configured, the proposal step consults a real LLM (strict, validated structured output); any failure falls back to the built-in deterministic proposal. The policy engine is the only authority that decides, and only the action layer executes — in simulation, and only on `APPROVE`.
 - **Policy first.** Policy runs before value and action. Hard blocks (`REVOKED`, `EXPIRED_MANDATE`, non-recoverable, retry limit exceeded, kill switch) are absolute.
 - **Human-in-the-loop without override risk.** High-value payments (> `human_approval_threshold`) and unknown failures become `REVIEW` and require a human approval recorded as a `HUMAN_APPROVAL` audit event. A human **cannot override a hard policy block**: approving a `BLOCK`ed case still results in no action (`backend/app/main.py` `/api/approvals`).
 - **Deterministic and auditable.** Diagnosis, decision, expected recovery and evaluation are deterministic. Every decision is appended to `backend/data/audit_logs.json` (they are never mutated; the file is append-only).
@@ -73,11 +74,26 @@ Payment failure event (synthetic dataset or Razorpay TEST webhook)
 | Stage | Service | Responsibility |
 |---|---|---|
 | Diagnosis | `services/diagnosis.py` | `failure_code`/`mandate_status` → root cause + confidence + recoverability |
-| AI proposal | `services/recovery_agent.py` | proposes `RETRY_LATER` / `REQUEST_FRESH_MANDATE` / `ESCALATE` with delay + confidence |
+| AI proposal | `services/recovery_agent.py` (`services/llm_provider.py`) | proposes `RETRY_LATER` / `REQUEST_FRESH_MANDATE` / `NO_ACTION` / `ESCALATE` with delay + confidence. Real LLM when configured and reachable, otherwise the deterministic proposal. Each proposal carries `proposal_source: "llm" \| "deterministic_fallback"` |
 | Policy | `services/policy_engine.py` | retry limits, cooling off, human-approval threshold, high-value reviews, kill switch; decides APPROVE/REVIEW/BLOCK |
 | Value | `services/recovery_value.py` | banded recovery probability per root cause → expected recovery, potential loss |
 | Action layer | `services/action_layer.py` | executes only on APPROVE, in simulation mode |
 | Orchestration | `services/recovery_engine.py` | `make_recovery_decision(...)` — diagnosis → proposal → policy → value → action → audit |
+
+### LLM-assisted proposal layer (optional, server-side)
+
+One real AI/LLM capability is wired into the existing pipeline as the **proposal/reasoning** stage only:
+
+```
+Payment failure → Diagnosis (deterministic) → REAL LLM Proposal → Policy Engine (decides) → Action Layer (executes only if allowed) → Audit
+```
+
+- **Propose, never execute.** The LLM returns strict structured JSON (`proposed_action`, `reason`, `confidence`, optional `customer_message` / `retry_after_hours`). The caller validates every field; the deterministic policy engine still decides and only the action layer executes — in simulation, and only on `APPROVE`. The LLM cannot charge a payment, call payment APIs, change retry limits or cooling-off, override a block or human approval, compute recovery value, flip the kill switch, or modify the audit log (enforced by design and by test).
+- **Strict structured output with validation.** The response is parsed as JSON (a markdown fence is tolerated) and validated field-by-field (`proposed_action` ∈ `{RETRY_LATER, REQUEST_FRESH_MANDATE, NO_ACTION, ESCALATE}`, `confidence` ∈ 0..1, `retry_after_hours` ∈ 1..168). Anything invalid — bad JSON, unknown action, out-of-range confidence — is discarded.
+- **Deterministic fallback, always.** No key configured, model timeout, rate limit, HTTP error or malformed reply ⇒ the pipeline uses the existing deterministic proposal (e.g. `BANK_TIMEOUT` → `RETRY_LATER` 12h). The application never 500s because the LLM provider is unavailable.
+- **Server-side only, environment-configured.** Credentials live in environment variables (`LLM_API_KEY`), optionally loaded from `backend/.env`; the key is never logged, returned by an API, or exposed to the frontend. A new dependency is not required: the adapter (`services/llm_provider.py`) calls an OpenAI-compatible `/chat/completions` endpoint with `httpx` (already a pinned dependency).
+- **Auditable provenance.** Every proposal records `proposal_source: "llm"` or `"deterministic_fallback"` inside `ai_proposal`, surfaced in the audit log and in the UI ("LLM" / "Deterministic fallback" badge and timeline labels).
+- **Evaluation stays reproducible without an API key.** The bulk/cached case pipeline, the metrics overview and the evaluation harness force the deterministic proposal path, so `evaluate_dataset.py` and the reported baseline numbers require no LLM and no network. Live per-payment decisions (`POST /api/recovery/decision`) and webhook ingestion consult the LLM when it is configured.
 
 ---
 
@@ -143,7 +159,7 @@ Reproducibility digest: `d6ae5d5acaadf6a3286962c5bef5cbea3438a01dad4e0e5eed55937
 ```
 mandate-doctor/
 ├── docker-compose.yml            # one-command stack (backend + frontend + volume)
-├── .env.example                  # env template (webhook secret placeholder)
+├── .env.example                  # env template (webhook + LLM placeholders)
 ├── data/synthetic/               # seed dataset CSV + deterministic generator
 ├── backend/
 │   ├── app/
@@ -152,7 +168,7 @@ mandate-doctor/
 │   │   │                         #            settings, webhooks, audit, policy,
 │   │   │                         #            recovery, dataset
 │   │   └── services/             # the pipeline engines described above
-│   ├── test_*.py                 # 59 pytest tests (doctor + webhook + settings)
+│   ├── test_*.py                 # 76 pytest tests (pipeline + webhook + settings + LLM proposal layer)
 │   ├── evaluate_dataset.py       # side-effect-free evaluation harness
 │   ├── send_test_webhook.py      # local signed-webhook test harness (Razorpay-compatible)
 │   ├── requirements.txt          # pinned Python dependencies
@@ -191,7 +207,7 @@ docker compose stop              # stop (state persists in the mandate_backend_d
 
 The backend serves FastAPI on `:8000`; the frontend is served by `vite dev` inside its container on `:8080`. The browser talks directly to `http://127.0.0.1:8000` (see `frontend/src/lib/api.ts`), so the backend port is published on the host. Runtime JSON state lives in the named volume `mandate_backend_data` mounted at `/app/backend/data`, so settings, audit log and webhook state survive restarts.
 
-> `RAZORPAY_WEBHOOK_SECRET` is read from a repository-root `.env` (copy `.env.example`) and passed into the backend by Compose via `${RAZORPAY_WEBHOOK_SECRET:-}`. With no value set the whole stack still runs; only webhook ingestion is inert (`500 server_not_configured`).
+> `RAZORPAY_WEBHOOK_SECRET`, `AI_PROPOSAL_ENABLED`, `LLM_API_KEY`, `LLM_MODEL`, `LLM_BASE_URL` and `LLM_TIMEOUT_SECONDS` are read from a repository-root `.env` (copy `.env.example`) and passed into the backend by Compose. With no values set the whole stack still runs; only webhook ingestion is inert (`500 server_not_configured`) and the proposal layer stays deterministic (LLM disabled until a key is provided). Never commit a real key — `backend/.env` and any root `.env` are git-ignored.
 
 ### Option B — Local development
 
@@ -222,6 +238,11 @@ Open **http://localhost:8080**.
 | Variable | Where | Effect |
 |---|---|---|
 | `RAZORPAY_WEBHOOK_SECRET` | root `.env` (passed to backend container) or `backend/.env` | Enables signed webhook ingestion; empty ⇒ `500 server_not_configured` on `POST /api/webhooks/razorpay` |
+| `AI_PROPOSAL_ENABLED` | root `.env` (passed to backend container) or `backend/.env` | Master switch for the LLM proposal layer. Default `true`; the layer is active only when an API key is also present, otherwise proposals are deterministic |
+| `LLM_API_KEY` | root `.env` (passed to backend container) or `backend/.env` | Server-side LLM credentials. Leave empty to keep the pipeline fully deterministic with no LLM/network dependency |
+| `LLM_MODEL` | same | Model name; default `gpt-4o-mini` |
+| `LLM_BASE_URL` | same | OpenAI-compatible base URL; default `https://api.openai.com/v1` |
+| `LLM_TIMEOUT_SECONDS` | same | Provider timeout before falling back to the deterministic proposal; default `10` |
 
 Copy the template and set a test value **only** if you want to exercise webhook ingestion:
 
@@ -294,7 +315,7 @@ venv\Scripts\python send_test_webhook.py http://127.0.0.1:8000 --secret test_web
 
 ## Testing
 
-59 pytest tests cover diagnosis, policy, recovery value, action layer, settings validation, audit, webhook signature/idempotency and the full decision flow.
+76 pytest tests cover diagnosis, policy, recovery value, action layer, settings validation, audit, webhook signature/idempotency, the full decision flow, and the LLM proposal layer (valid structured proposals, invalid output/timeout/API failure ⇒ deterministic fallback, LLM cannot override a policy block, LLM cannot execute directly, key not exposed to the frontend, evaluation stays deterministic with no API key). All tests pass with no LLM configured and no network access.
 
 ```bash
 cd backend
@@ -309,7 +330,7 @@ cd backend
 venv\Scripts\python evaluate_dataset.py
 ```
 
-Prints the full evaluation report (diagnosis, decisions, revenue breakdown, both baseline comparisons, unsafe retries avoided, by-diagnosis table, reproducibility digest). Side-effect free: no audit records are written and settings are never mutated.
+Prints the full evaluation report (diagnosis, decisions, revenue breakdown, both baseline comparisons, unsafe retries avoided, by-diagnosis table, reproducibility digest). Side-effect free: no audit records are written, settings are never mutated, and the deterministic proposal path is used (no live LLM call), so it runs with no API key and reproduces the exact numbers above.
 
 ---
 
@@ -318,7 +339,7 @@ Prints the full evaluation report (diagnosis, decisions, revenue breakdown, both
 | Route | Page |
 |---|---|
 | `/` | Overview — revenue at risk, expected recovery, decision summary |
-| `/recovery-cases` | Case list + per-case replay of diagnosis/proposal/policy/action |
+| `/recovery-cases` | Case list + per-case replay of diagnosis/proposal/policy/action (proposal badge: "LLM" or "Deterministic fallback") |
 | `/approvals` | Human-in-the-loop approval queue (REVIEW cases) |
 | `/analytics` | Trends and aggregated metrics |
 | `/audit-replay` | Append-only audit log viewer |
@@ -332,6 +353,7 @@ Prints the full evaluation report (diagnosis, decisions, revenue breakdown, both
 - **Expected, not realised, recovery.** Figures come from the shared model (`BANK_TIMEOUT 75%`, `BALANCE 55%`, `LIMIT_EXCEEDED 40%`, `EXPIRED 20%`, `REVOKED 0%`) over a synthetic dataset with no real outcomes.
 - **Parity with the defensible naive on this dataset.** Value here is safety/governance (74 unsafe retries refused, 0 policy violations, deterministic audit) and architecture, not out-yielding a retry loop on these 300 synthetic rows.
 - **No database.** State persists as JSON files under `backend/data/`; the audit log grows append-only (one ~300-row batch per cold-cache full run).
+- **LLM proposal layer is optional and proposal-only.** It needs a real `LLM_API_KEY`; without one (or on timeout/rate-limit/API error/invalid output) proposals fall back to the deterministic logic, so behavior and evaluation numbers are unchanged. The LLM only ever proposes — it never decides or executes.
 - **Frontend is served by `vite dev`**, not a production build, matching the project's existing workflow.
 - **Webhook ingestion is inert** until `RAZORPAY_WEBHOOK_SECRET` is configured.
 - **API endpoints are unauthenticated** in this simulation/demo and are intended for local/demo use.

@@ -33,10 +33,12 @@ The safe/recoverable-subset comparison restricts both strategies to the
 that comparable subset.
 
 Side-effect free: ``evaluate()`` computes the decision pipeline with audit
-persistence disabled (``make_recovery_decision(..., audit=False)``), never
-appends to ``audit_logs.json`` and never mutates settings. Repeated runs with
-the same dataset and same settings produce identical metrics, and the metric
-payload contains no timestamps or audit side effects.
+persistence disabled (``make_recovery_decision(..., audit=False,
+use_llm=False)`` — the deterministic proposal path, so no live LLM call is
+required), never appends to ``audit_logs.json`` and never mutates settings.
+Repeated runs with the same dataset and same settings produce identical
+metrics, and the metric payload contains no timestamps or audit side
+effects.
 """
 
 import hashlib
@@ -154,7 +156,7 @@ def evaluate() -> dict[str, Any]:
 
     for record in records:
         payment = _payment_from_record(record)
-        result = make_recovery_decision(payment, audit=False)
+        result = make_recovery_decision(payment, audit=False, use_llm=False)
 
         diagnosis = result["diagnosis"]
         root_cause = diagnosis["root_cause"]

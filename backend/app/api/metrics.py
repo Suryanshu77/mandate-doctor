@@ -131,7 +131,7 @@ def overview_metrics():
             "previous_failures": int(record.get("previous_failures", 0)),
         }
 
-        result = make_recovery_decision(payment)
+        result = make_recovery_decision(payment, use_llm=False)
 
         total_at_risk += result["recovery_value"]["amount_at_risk"]
         expected_recovery += result["recovery_value"]["expected_recovery"]

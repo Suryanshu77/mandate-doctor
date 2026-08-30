@@ -18,6 +18,18 @@ import {
 const tipStyle = { background: "var(--popover)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 };
 
 function Principle() { return <div className="flex items-center gap-3 rounded-lg border border-ai/20 bg-ai-soft px-4 py-3"><BrainCircuit className="size-4 shrink-0 text-ai"/><p className="text-xs text-muted-foreground"><strong className="text-foreground">The AI proposes.</strong> The Policy Engine decides.</p></div>; }
+function ProposalSourceBadge({ source }: { source?: string }) {
+  if (source === "llm") return <Badge status="AI">LLM</Badge>;
+  if (source === "deterministic_fallback")
+    return <Badge status="Deterministic">Deterministic fallback</Badge>;
+  return null;
+}
+const proposalSourceText = (source?: string) =>
+  source === "llm"
+    ? " — proposed by LLM"
+    : source === "deterministic_fallback"
+      ? " — deterministic fallback"
+      : "";
 function SectionTitle({ title, sub, action }: { title: string; sub: string; action?: React.ReactNode }) { return <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4"><div className="min-w-0"><h2 className="text-base font-semibold text-foreground">{title}</h2><p className="mt-1 text-xs text-muted-foreground">{sub}</p></div>{action}</div>; }
 function CasesTable({ rows }: { rows: RecoveryCase[] }) { return <div className="mt-5 overflow-x-auto"><table className="w-full min-w-[880px] text-left"><thead><tr className="border-b border-border text-[10px] uppercase tracking-[0.1em] text-muted-foreground"><th className="pb-3 font-medium">Payment</th><th className="pb-3 font-medium">Amount</th><th className="pb-3 font-medium">Failure</th><th className="pb-3 font-medium">Diagnosis</th><th className="pb-3 font-medium">Action</th><th className="pb-3 font-medium">Status</th><th/></tr></thead><tbody>{rows.map((c) => <tr key={c.id} className="group border-b border-border/60 text-sm last:border-0 hover:bg-accent/30"><td className="py-4"><p className="font-mono text-xs text-foreground">{c.payment}</p><p className="mt-1 text-[11px] text-muted-foreground">{c.customer}</p></td><td className="py-4 font-medium text-foreground">{c.amount}</td><td className="py-4 text-muted-foreground">{c.failure}</td><td className="max-w-52 py-4 text-muted-foreground">{c.diagnosis}</td><td className="max-w-52 py-4 text-muted-foreground">{c.action}</td><td className="py-4"><Badge status={c.status}/></td><td className="py-4"><Link to="/recovery-cases/$caseId" params={{ caseId: c.id }} aria-label={`View ${c.id}`} className="grid size-8 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"><ChevronRight className="size-4"/></Link></td></tr>)}</tbody></table></div>; }
 function formatRecoveryCase(c: any): RecoveryCase {
@@ -331,7 +343,7 @@ export function CaseReplayPage() {
         {
           title: "AI Proposal",
           time: "",
-          detail: proposal.proposal || proposal.action || "Recovery action proposed.",
+          detail: `${proposal.proposal || proposal.action || "Recovery action proposed."}${proposalSourceText(proposal.proposal_source)}`,
           tone: "ai",
         },
         {
@@ -388,7 +400,7 @@ export function CaseReplayPage() {
           <PageHeader
             eyebrow={`Decision replay · ${caseId}`}
             title={`₹${Number(caseData.amount_inr).toLocaleString("en-IN")} · ${caseData.payment_id}`}
-            description="A complete, deterministic replay of how this failed payment was diagnosed and governed."
+            description="A complete replay of how this failed payment was diagnosed, proposed, and governed."
             action={
               <Badge
                 status={
@@ -466,7 +478,10 @@ export function CaseReplayPage() {
 
             <div className="space-y-4">
               <Panel>
-                <p className="eyebrow">AI Agent</p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="eyebrow">AI Agent</p>
+                  <ProposalSourceBadge source={proposal.proposal_source} />
+                </div>
                 <p className="mt-3 text-sm font-semibold">
                   Proposes the best action
                 </p>
@@ -628,7 +643,10 @@ export function ApprovalsPage() {
                     </p>
                   </div>
                   <div>
-                    <p className="eyebrow">AI recommendation</p>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="eyebrow">AI recommendation</p>
+                      <ProposalSourceBadge source={c.ai_proposal?.proposal_source} />
+                    </div>
                     <p className="mt-2 text-sm text-foreground">{c.ai_proposal?.proposal}</p>
                   </div>
                   <div>
@@ -889,7 +907,8 @@ export function AuditReplayPage() {
         {
           title: "AI Proposal",
           detail:
-            selected.ai_proposal?.proposal || "Recovery action proposed.",
+            (selected.ai_proposal?.proposal || "Recovery action proposed.") +
+            proposalSourceText(selected.ai_proposal?.proposal_source),
           tone: "ai",
         },
         {
@@ -1057,7 +1076,8 @@ export function AuditReplayPage() {
 
               <p className="mt-2 text-xs leading-5 text-muted-foreground">
                 Inputs, model proposal, policy decision, and final outcome
-                are preserved together.
+                are preserved together. Each proposal carries its source:
+                an LLM proposal or the deterministic policy fallback.
               </p>
             </Panel>
 
